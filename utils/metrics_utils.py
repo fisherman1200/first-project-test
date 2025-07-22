@@ -1,0 +1,46 @@
+import json
+import os
+from typing import List, Dict, Any
+
+class MetricsLogger:
+    """
+    MetricsLogger 用于统一管理训练过程中的各种指标。
+
+    用法：
+        logger = MetricsLogger(keys=['root', 'true', 'acc'])
+        for epoch in ...:
+            # 计算 avg_metrics = {'root': avg_root, 'true': avg_true, 'acc': avg_acc}
+            logger.add(epoch, avg_metrics)
+        logger.save('data/processed/metrics.json')
+    """
+    def __init__(self, keys: List[str]):
+        # keys: 指标名列表
+        self.keys = keys
+        # 初始化一个空 dict: key -> list of values
+        self.data: Dict[str, List[Any]] = {k: [] for k in keys}
+        self.epochs: List[int] = []
+
+    def add(self, epoch: int, metrics: Dict[str, Any]):
+        """
+        添加当前 epoch 的所有指标，metrics 必须包含初始化的 keys。
+        """
+        self.epochs.append(epoch)
+        for k in self.keys:
+            if k not in metrics:
+                raise KeyError(f"Metrics for key '{k}' missing in metrics dict.")
+            self.data[k].append(metrics[k])
+
+    def save(self, filepath: str) -> None:
+        """
+        将收集到的指标保存为 JSON 文件，包含 epochs 列表和每个 key 对应的值。
+        """
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        out = {k: self.data[k] for k in self.keys}
+        out['epoch'] = self.epochs
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+
+# 示例：
+# logger = MetricsLogger(['root', 'true', 'acc'])
+# logger.add(epoch, {'root': avg_root, 'true': avg_true, 'acc': avg_acc})
+# logger.save('data/processed/metrics.json')

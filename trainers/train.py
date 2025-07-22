@@ -9,6 +9,9 @@ from datasets.alarm_dataset import AlarmDataset
 from models.gnn_transformer import GNNTransformer  # 用于节点级别嵌入
 from models.alarm_transformer import AlarmTransformer
 from torch.nn import MultiheadAttention
+from tqdm import tqdm
+import json
+from utils.metrics_utils import MetricsLogger
 
 
 def train_model():
@@ -83,10 +86,13 @@ def train_model():
         lr=1e-3
     )
 
+    # 初始化 Logger，指定要记录的关键指标名
+    logger = MetricsLogger(keys=['root', 'true'])  # 日后可加 'acc', 'lr' …
+
     # 6) 训练循环
     for epoch in range(10):
         total_root, total_true = 0.0, 0.0
-        for batch in loader:
+        for batch in tqdm(loader, desc=f"Epoch {epoch}"):
             # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
             # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
             seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]
@@ -108,7 +114,9 @@ def train_model():
             # 6.4 Gating Mechanism 融合
             cat = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
             gate = gate_net(cat)  # [B, 1] in (0,1)
-            fused = gate * node_feat + (1 - gate) * text_feat  # [B, 64]
+            # fused = gate * node_feat + (1 - gate) * text_feat  # [B, 64]
+            # —— 或者用 attn_fused 参与 gating：
+            fused = gate * attn_fused + (1 - gate) * text_feat
 
             # 6.5 Multi-Task Head
             z = shared(fused)  # [B, 128]
@@ -126,7 +134,7 @@ def train_model():
             if mask.any():
                 loss_true = F.cross_entropy(out_true[mask], true_label[mask])
             else:
-                loss_true = torch.tensor(0.0, device=h.device)
+                loss_true = torch.tensor(0.0, device=fused.device)
             loss = loss_root + 2.0 * loss_true
 
             total_root += loss_root.item()
@@ -137,8 +145,14 @@ def train_model():
             optimizer.step()
             optimizer.zero_grad()
 
-        print(f"Epoch {epoch:02d} | Loss_root={total_root / len(loader):.4f} "
-              f"| Loss_true={total_true / len(loader):.4f}")
+        avg_root = total_root / len(loader)
+        avg_true = total_true / len(loader)
+        print(f"Epoch {epoch:02d} | Loss_root={avg_root:.4f} | Loss_true={avg_true:.4f}")
+        #  添加到 logger
+        avg_metrics = {'root': avg_root, 'true': avg_true}
+        logger.add(epoch, avg_metrics)
+
+    logger.save('data/raw/metrics.json')
 
 
 if __name__ == '__main__':
