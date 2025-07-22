@@ -1,6 +1,7 @@
 import json
 import os
 from typing import List, Dict, Any
+from datetime import datetime
 
 class MetricsLogger:
     """
@@ -30,17 +31,23 @@ class MetricsLogger:
                 raise KeyError(f"Metrics for key '{k}' missing in metrics dict.")
             self.data[k].append(metrics[k])
 
-    def save(self, filepath: str) -> None:
+    def save(self) -> None:
         """
         将收集到的指标保存为 JSON 文件，包含 epochs 列表和每个 key 对应的值。
         """
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        # 生成默认输出目录和文件名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        default_dir = os.path.join('data', 'raw')
+        filename = f'metrics_data_{timestamp}.json'
+        output_path = os.path.join(default_dir, filename)
+
+        os.makedirs(os.path.dirname(default_dir), exist_ok=True)
         out = {k: self.data[k] for k in self.keys}
         out['epoch'] = self.epochs
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
 
 # 示例：
 # logger = MetricsLogger(['root', 'true', 'acc'])
 # logger.add(epoch, {'root': avg_root, 'true': avg_true, 'acc': avg_acc})
-# logger.save('data/processed/metrics.json')
+# logger.save()

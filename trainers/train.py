@@ -14,24 +14,25 @@ import json
 from utils.metrics_utils import MetricsLogger
 
 
-def train_model():
+def train_model(cfg):
     # 1) 加载网络拓扑数据
-    topo_ds = TopologyDataset("data/topo_graph.json")
+    topo_ds = TopologyDataset(cfg.data.topo_path)
     x_dict, edge_index_dict, edge_attr_dict = topo_ds[0]
     # node_ids 是真实节点的列表，对应的索引是 1..len(node_ids)
     node_map = {nid: idx + 1 for idx, nid in enumerate(topo_ds.node_ids)}
     # 这样，node_map[...] 永远不会生成 0，0 被专门留给 PAD
 
     # 2) 加载告警日志数据
-    alarm_ds = AlarmDataset("data/alarms.json", node_map)
-    loader = DataLoader(alarm_ds, batch_size=16, shuffle=True)
+    alarm_ds = AlarmDataset(cfg.data.alarm_path, node_map, max_len=cfg.data.max_len,
+                            window_minutes=cfg.data.window_minutes, step_minutes=cfg.data.step_minutes)
+    loader = DataLoader(alarm_ds, batch_size=cfg.data.batch_size, shuffle=True)
 
     # 3) 构建 GNN 编码器
     gnn = GNNTransformer(
         in_channels=topo_ds.feature_dim,
-        hidden_channels=64,
-        dropout=0.3,
-        num_layers=3
+        hidden_channels=cfg.gnn.hidden_channels,
+        dropout=cfg.gnn.dropout,
+        num_layers=cfg.gnn.num_layers
     )
 
     # 预计算一次所有节点的 embedding
@@ -52,12 +53,13 @@ def train_model():
     # text_feat 的 shape 是 [L, feat_dim]
     feat_dim = alarm_ds[0]['text_feat'].shape[1]  # [B,L,feat_dim]
     at = AlarmTransformer(
-        input_dim=feat_dim,
-        emb_dim=64,
-        nhead=4,
-        hid_dim=128,
-        max_len=alarm_ds.max_len,
-        nlayers=2
+        input_dim=alarm_ds[0]['text_feat'].shape[1],
+        emb_dim=cfg.transformer.emb_dim,
+        nhead=cfg.transformer.nhead,
+        hid_dim=cfg.transformer.hid_dim,
+        nlayers=cfg.transformer.nlayers,
+        max_len=cfg.transformer.max_len,
+        dropout=cfg.transformer.dropout
     )
 
     #  定义跨模态注意力 & 门控网络
@@ -83,14 +85,15 @@ def train_model():
         list(shared.parameters()) +
         list(head_root.parameters()) +
         list(head_true.parameters()),
-        lr=1e-3
+        lr=cfg.training.lr,
+        weight_decay=cfg.training.weight_decay
     )
 
     # 初始化 Logger，指定要记录的关键指标名
     logger = MetricsLogger(keys=['root', 'true'])  # 日后可加 'acc', 'lr' …
 
     # 6) 训练循环
-    for epoch in range(10):
+    for epoch in range(cfg.training.epochs):
         total_root, total_true = 0.0, 0.0
         for batch in tqdm(loader, desc=f"Epoch {epoch}"):
             # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
@@ -152,8 +155,5 @@ def train_model():
         avg_metrics = {'root': avg_root, 'true': avg_true}
         logger.add(epoch, avg_metrics)
 
-    logger.save('data/raw/metrics.json')
-
-
-if __name__ == '__main__':
-    train_model()
+    #生成metrics数据json
+    logger.save()

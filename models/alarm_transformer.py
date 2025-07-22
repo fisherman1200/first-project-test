@@ -3,7 +3,7 @@ from torch import nn
 from models.pos_encoding import PositionalEncoding
 
 class AlarmTransformer(nn.Module):
-    def __init__(self, input_dim, emb_dim, nhead, hid_dim, max_len, nlayers):
+    def __init__(self, input_dim, emb_dim, nhead, hid_dim, max_len, nlayers, dropout):
         """
         input_dim : text_feat 的维度
         emb_dim   : Transformer embedding 维度
@@ -21,7 +21,7 @@ class AlarmTransformer(nn.Module):
             d_model=emb_dim,
             nhead=nhead,
             dim_feedforward=hid_dim,
-            dropout=0.1,
+            dropout=dropout,
             batch_first=True,
             activation='gelu',
             norm_first=True
@@ -30,7 +30,7 @@ class AlarmTransformer(nn.Module):
         # 4) 池化 & 归一化
         self.pool = nn.AdaptiveAvgPool1d(1)
         self.norm = nn.LayerNorm(emb_dim)
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(dropout)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -6,3 +6,4 @@ networkx
 scikit-learn
 tqdm
 matplotlib
+PyYAML==6.0

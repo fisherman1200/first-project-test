@@ -1,0 +1,26 @@
+# config.yaml
+data:
+  topo_path: data/topo_graph.json
+  alarm_path: data/alarms.json
+  batch_size: 16
+  max_len: 16
+  window_minutes: 10
+  step_minutes: 5
+
+model:
+  gnn:
+    hidden_channels: 64
+    num_layers: 3
+    dropout: 0.3
+  transformer:
+    emb_dim: 64
+    nhead: 4
+    hid_dim: 128
+    nlayers: 2
+    max_len: 16
+    dropout: 0.1
+
+training:
+  epochs: 10
+  lr: 0.001
+  weight_decay: 1e-5
