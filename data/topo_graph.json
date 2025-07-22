@@ -1,0 +1,2366 @@
+{
+  "nodes": [
+    {
+      "id": "上海市",
+      "type": "core",
+      "location": [
+        31.21291808268474,
+        121.48454735029624
+      ]
+    },
+    {
+      "id": "北京市",
+      "type": "core",
+      "location": [
+        40.185627980321,
+        116.4126254785551
+      ]
+    },
+    {
+      "id": "武汉市",
+      "type": "core",
+      "location": [
+        30.624104711962563,
+        114.34297049141068
+      ]
+    },
+    {
+      "id": "郑州市",
+      "type": "core",
+      "location": [
+        34.62678416178949,
+        113.47112828189196
+      ]
+    },
+    {
+      "id": "沈阳市",
+      "type": "core",
+      "location": [
+        42.094322074929686,
+        123.13766076255304
+      ]
+    },
+    {
+      "id": "西安市",
+      "type": "core",
+      "location": [
+        34.10703654654659,
+        108.7917616251406
+      ]
+    },
+    {
+      "id": "重庆市",
+      "type": "core",
+      "location": [
+        30.05722604691124,
+        107.87458064717448
+      ]
+    },
+    {
+      "id": "广州市",
+      "type": "core",
+      "location": [
+        23.33084804046072,
+        113.5389732808113
+      ]
+    },
+    {
+      "id": "陕西省",
+      "type": "agg",
+      "location": [
+        35.192093677572416,
+        108.86921424869097
+      ]
+    },
+    {
+      "id": "台湾省",
+      "type": "agg",
+      "location": [
+        23.74164080662601,
+        120.96132436471736
+      ]
+    },
+    {
+      "id": "广西壮族自治区",
+      "type": "agg",
+      "location": [
+        23.82111527130741,
+        108.78828075498612
+      ]
+    },
+    {
+      "id": "山西省",
+      "type": "agg",
+      "location": [
+        37.57235785367627,
+        112.289474734092
+      ]
+    },
+    {
+      "id": "海南省",
+      "type": "agg",
+      "location": [
+        17.865831352607344,
+        110.30513299432356
+      ]
+    },
+    {
+      "id": "河南省",
+      "type": "agg",
+      "location": [
+        33.88259845967939,
+        113.61456820312048
+      ]
+    },
+    {
+      "id": "河北省",
+      "type": "agg",
+      "location": [
+        39.54575504616268,
+        116.14324825334022
+      ]
+    },
+    {
+      "id": "天津市",
+      "type": "agg",
+      "location": [
+        39.28566310330579,
+        117.3480122376073
+      ]
+    },
+    {
+      "id": "新疆维吾尔自治区",
+      "type": "agg",
+      "location": [
+        41.11724542140978,
+        85.19152675601067
+      ]
+    },
+    {
+      "id": "黑龙江省",
+      "type": "agg",
+      "location": [
+        47.86942319023268,
+        127.75591236330766
+      ]
+    },
+    {
+      "id": "江苏省",
+      "type": "agg",
+      "location": [
+        32.96583086601394,
+        119.48896385384624
+      ]
+    },
+    {
+      "id": "广东省",
+      "type": "agg",
+      "location": [
+        23.30773104164141,
+        113.41322653462711
+      ]
+    },
+    {
+      "id": "澳门特别行政区",
+      "type": "agg",
+      "location": [
+        22.16290883530383,
+        113.56216710414084
+      ]
+    },
+    {
+      "id": "香港特别行政区",
+      "type": "agg",
+      "location": [
+        22.375855202477627,
+        114.13402015121164
+      ]
+    },
+    {
+      "id": "云南省",
+      "type": "agg",
+      "location": [
+        24.97527094638657,
+        101.48657050884968
+      ]
+    },
+    {
+      "id": "青海省",
+      "type": "agg",
+      "location": [
+        35.670780852814566,
+        96.0394188235659
+      ]
+    },
+    {
+      "id": "内蒙古自治区",
+      "type": "agg",
+      "location": [
+        44.09797477632044,
+        113.93675766422965
+      ]
+    },
+    {
+      "id": "贵州省",
+      "type": "agg",
+      "location": [
+        26.81562504952732,
+        106.8746323182134
+      ]
+    },
+    {
+      "id": "安徽省",
+      "type": "agg",
+      "location": [
+        31.82584422976237,
+        117.22619307688822
+      ]
+    },
+    {
+      "id": "辽宁省",
+      "type": "agg",
+      "location": [
+        41.27593651723691,
+        122.59483710104882
+      ]
+    },
+    {
+      "id": "邯郸市",
+      "type": "access",
+      "location": [
+        36.55244706480266,
+        114.54295090332192
+      ]
+    },
+    {
+      "id": "泰州市",
+      "type": "access",
+      "location": [
+        32.57095322689002,
+        120.05634102197202
+      ]
+    },
+    {
+      "id": "北屯市",
+      "type": "access",
+      "location": [
+        47.24409572383345,
+        87.95331510452526
+      ]
+    },
+    {
+      "id": "南宁市",
+      "type": "access",
+      "location": [
+        23.057188451090106,
+        108.46366464886376
+      ]
+    },
+    {
+      "id": "咸宁市",
+      "type": "access",
+      "location": [
+        29.624377020192103,
+        114.17509652374233
+      ]
+    },
+    {
+      "id": "德州市",
+      "type": "access",
+      "location": [
+        37.248213223386045,
+        116.64710824740314
+      ]
+    },
+    {
+      "id": "扬州市",
+      "type": "access",
+      "location": [
+        32.73728882089874,
+        119.47448387405692
+      ]
+    },
+    {
+      "id": "福州市",
+      "type": "access",
+      "location": [
+        26.04776503564512,
+        119.20211963202946
+      ]
+    },
+    {
+      "id": "荆州市",
+      "type": "access",
+      "location": [
+        29.996653216629745,
+        112.5698296604698
+      ]
+    },
+    {
+      "id": "通化市",
+      "type": "access",
+      "location": [
+        41.95614100204413,
+        125.9491716468228
+      ]
+    },
+    {
+      "id": "葫芦岛市",
+      "type": "access",
+      "location": [
+        40.6170971018473,
+        120.20442819146102
+      ]
+    },
+    {
+      "id": "湘西土家族苗族自治州",
+      "type": "access",
+      "location": [
+        28.694857249482503,
+        109.7270458601341
+      ]
+    },
+    {
+      "id": "吉林市",
+      "type": "access",
+      "location": [
+        43.57965058825516,
+        126.84327812349473
+      ]
+    },
+    {
+      "id": "湘潭市",
+      "type": "access",
+      "location": [
+        27.73160662447753,
+        112.60290366660334
+      ]
+    },
+    {
+      "id": "恩施土家族苗族自治州",
+      "type": "access",
+      "location": [
+        30.19150135494532,
+        109.54941291607116
+      ]
+    },
+    {
+      "id": "榆林市",
+      "type": "access",
+      "location": [
+        38.03854288381539,
+        109.56597610179506
+      ]
+    },
+    {
+      "id": "烟台市",
+      "type": "access",
+      "location": [
+        37.24493107675676,
+        120.79933326880492
+      ]
+    },
+    {
+      "id": "呼和浩特市",
+      "type": "access",
+      "location": [
+        40.59108952380444,
+        111.49799226133948
+      ]
+    },
+    {
+      "id": "琼海市",
+      "type": "access",
+      "location": [
+        19.21199098563111,
+        110.41761365508056
+      ]
+    },
+    {
+      "id": "毕节市",
+      "type": "access",
+      "location": [
+        27.0654828086074,
+        105.2105216271257
+      ]
+    },
+    {
+      "id": "伊春市",
+      "type": "access",
+      "location": [
+        47.81296377470368,
+        129.21224796683308
+      ]
+    },
+    {
+      "id": "娄底市",
+      "type": "access",
+      "location": [
+        27.73900915064646,
+        111.61310758240344
+      ]
+    },
+    {
+      "id": "锦州市",
+      "type": "access",
+      "location": [
+        41.45740906473609,
+        121.61152329484918
+      ]
+    },
+    {
+      "id": "保山市",
+      "type": "access",
+      "location": [
+        24.976311044529467,
+        98.97171094829191
+      ]
+    },
+    {
+      "id": "安阳市",
+      "type": "access",
+      "location": [
+        35.87731107169153,
+        114.35293458330428
+      ]
+    },
+    {
+      "id": "庆阳市",
+      "type": "access",
+      "location": [
+        36.16227495057292,
+        107.59051655009968
+      ]
+    },
+    {
+      "id": "天水市",
+      "type": "access",
+      "location": [
+        34.64729567572304,
+        105.73775211393284
+      ]
+    },
+    {
+      "id": "邵阳市",
+      "type": "access",
+      "location": [
+        26.913318493215467,
+        110.87446183544084
+      ]
+    },
+    {
+      "id": "拉萨市",
+      "type": "access",
+      "location": [
+        30.037322041496505,
+        91.08983075745633
+      ]
+    },
+    {
+      "id": "马鞍山市",
+      "type": "access",
+      "location": [
+        31.63844067171333,
+        118.36584259190936
+      ]
+    },
+    {
+      "id": "可克达拉市",
+      "type": "access",
+      "location": [
+        43.91103329900678,
+        80.6831219409914
+      ]
+    },
+    {
+      "id": "大连市",
+      "type": "access",
+      "location": [
+        39.58485864318499,
+        122.19097048565597
+      ]
+    },
+    {
+      "id": "包头市",
+      "type": "access",
+      "location": [
+        41.54929816923375,
+        110.26040842529976
+      ]
+    },
+    {
+      "id": "中卫市",
+      "type": "access",
+      "location": [
+        37.01284625418224,
+        105.50131746246484
+      ]
+    },
+    {
+      "id": "南平市",
+      "type": "access",
+      "location": [
+        27.33944439419377,
+        118.1420960916364
+      ]
+    },
+    {
+      "id": "洛阳市",
+      "type": "access",
+      "location": [
+        34.29236861625869,
+        112.03183945632652
+      ]
+    },
+    {
+      "id": "南昌市",
+      "type": "access",
+      "location": [
+        28.649793151042548,
+        116.01858897044008
+      ]
+    },
+    {
+      "id": "辽源市",
+      "type": "access",
+      "location": [
+        42.81082407740576,
+        125.30548840975996
+      ]
+    },
+    {
+      "id": "三沙市",
+      "type": "access",
+      "location": [
+        9.827091878928815,
+        113.6750899774827
+      ]
+    },
+    {
+      "id": "甘南藏族自治州",
+      "type": "access",
+      "location": [
+        34.32153192325346,
+        102.76452561582514
+      ]
+    },
+    {
+      "id": "岳阳市",
+      "type": "access",
+      "location": [
+        29.06636125675323,
+        113.25431922039094
+      ]
+    },
+    {
+      "id": "杭州市",
+      "type": "access",
+      "location": [
+        29.89983403841846,
+        119.47075690840911
+      ]
+    },
+    {
+      "id": "益阳市",
+      "type": "access",
+      "location": [
+        28.57523161626309,
+        111.95132166296044
+      ]
+    },
+    {
+      "id": "长沙市",
+      "type": "access",
+      "location": [
+        28.227144735233964,
+        113.1529964659999
+      ]
+    },
+    {
+      "id": "亳州市",
+      "type": "access",
+      "location": [
+        33.43549547412517,
+        116.1802764648928
+      ]
+    },
+    {
+      "id": "昌吉回族自治州",
+      "type": "access",
+      "location": [
+        44.345378902849816,
+        88.63468927054609
+      ]
+    },
+    {
+      "id": "潍坊市",
+      "type": "access",
+      "location": [
+        36.55154860564476,
+        119.07258008608
+      ]
+    },
+    {
+      "id": "双河市",
+      "type": "access",
+      "location": [
+        44.874142959399926,
+        82.35995107391749
+      ]
+    },
+    {
+      "id": "和田地区",
+      "type": "access",
+      "location": [
+        37.07414908687976,
+        80.91005014032646
+      ]
+    },
+    {
+      "id": "果洛藏族自治州",
+      "type": "access",
+      "location": [
+        34.116411396443986,
+        99.42016641645874
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "上海市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 1095.766047611222,
+      "latency_ms": 5.5
+    },
+    {
+      "source": "上海市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 685.6221747743895,
+      "latency_ms": 3.4
+    },
+    {
+      "source": "上海市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 839.3643058347466,
+      "latency_ms": 4.2
+    },
+    {
+      "source": "上海市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 1216.4734924352965,
+      "latency_ms": 6.1
+    },
+    {
+      "source": "上海市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 1232.248018141736,
+      "latency_ms": 6.2
+    },
+    {
+      "source": "上海市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 1310.1678912001262,
+      "latency_ms": 6.6
+    },
+    {
+      "source": "上海市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 1174.6554480018146,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "上海市",
+      "target": "江苏省",
+      "bandwidth": "100G",
+      "distance_km": 270.6748261312832,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "北京市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 1095.766047611222,
+      "latency_ms": 5.5
+    },
+    {
+      "source": "北京市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 1077.2733224105536,
+      "latency_ms": 5.4
+    },
+    {
+      "source": "北京市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 669.5515031589424,
+      "latency_ms": 3.3
+    },
+    {
+      "source": "北京市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 602.8807889049618,
+      "latency_ms": 3.0
+    },
+    {
+      "source": "北京市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 955.0196982440149,
+      "latency_ms": 4.8
+    },
+    {
+      "source": "北京市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 1365.3082547861472,
+      "latency_ms": 6.8
+    },
+    {
+      "source": "北京市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 1888.3810612855457,
+      "latency_ms": 9.4
+    },
+    {
+      "source": "北京市",
+      "target": "山西省",
+      "bandwidth": "100G",
+      "distance_km": 460.5241544417608,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "北京市",
+      "target": "河北省",
+      "bandwidth": "100G",
+      "distance_km": 74.6913134272225,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "北京市",
+      "target": "天津市",
+      "bandwidth": "100G",
+      "distance_km": 128.11505584402286,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "北京市",
+      "target": "内蒙古自治区",
+      "bandwidth": "100G",
+      "distance_km": 480.2922134240726,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "武汉市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 685.6221747743895,
+      "latency_ms": 3.4
+    },
+    {
+      "source": "武汉市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 1077.2733224105536,
+      "latency_ms": 5.4
+    },
+    {
+      "source": "武汉市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 451.3599758576668,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "武汉市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 1495.7317386007194,
+      "latency_ms": 7.5
+    },
+    {
+      "source": "武汉市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 649.5334489129478,
+      "latency_ms": 3.2
+    },
+    {
+      "source": "武汉市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 625.0458994081635,
+      "latency_ms": 3.1
+    },
+    {
+      "source": "武汉市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 812.0451031508181,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "武汉市",
+      "target": "江苏省",
+      "bandwidth": "100G",
+      "distance_km": 552.0934724207198,
+      "latency_ms": 2.8
+    },
+    {
+      "source": "武汉市",
+      "target": "广东省",
+      "bandwidth": "100G",
+      "distance_km": 815.908525964375,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "武汉市",
+      "target": "澳门特别行政区",
+      "bandwidth": "100G",
+      "distance_km": 940.68230081408,
+      "latency_ms": 4.7
+    },
+    {
+      "source": "武汉市",
+      "target": "香港特别行政区",
+      "bandwidth": "100G",
+      "distance_km": 914.1168894486834,
+      "latency_ms": 4.6
+    },
+    {
+      "source": "武汉市",
+      "target": "安徽省",
+      "bandwidth": "100G",
+      "distance_km": 305.30219050488824,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "郑州市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 839.3643058347466,
+      "latency_ms": 4.2
+    },
+    {
+      "source": "郑州市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 669.5515031589424,
+      "latency_ms": 3.3
+    },
+    {
+      "source": "郑州市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 451.3599758576668,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "郑州市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 1182.0902086164624,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "郑州市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 434.2375977897894,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "郑州市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 730.7356672320385,
+      "latency_ms": 3.7
+    },
+    {
+      "source": "郑州市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 1252.028961515963,
+      "latency_ms": 6.3
+    },
+    {
+      "source": "郑州市",
+      "target": "山西省",
+      "bandwidth": "100G",
+      "distance_km": 343.7190736700919,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "郑州市",
+      "target": "河南省",
+      "bandwidth": "100G",
+      "distance_km": 83.60084137916171,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "沈阳市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 1216.4734924352965,
+      "latency_ms": 6.1
+    },
+    {
+      "source": "沈阳市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 602.8807889049618,
+      "latency_ms": 3.0
+    },
+    {
+      "source": "沈阳市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 1495.7317386007194,
+      "latency_ms": 7.5
+    },
+    {
+      "source": "沈阳市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 1182.0902086164624,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "沈阳市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 1535.8700067380662,
+      "latency_ms": 7.7
+    },
+    {
+      "source": "沈阳市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 1911.0791768408249,
+      "latency_ms": 9.6
+    },
+    {
+      "source": "沈阳市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 2263.4711350338093,
+      "latency_ms": 11.3
+    },
+    {
+      "source": "沈阳市",
+      "target": "黑龙江省",
+      "bandwidth": "100G",
+      "distance_km": 737.6265349956587,
+      "latency_ms": 3.7
+    },
+    {
+      "source": "沈阳市",
+      "target": "辽宁省",
+      "bandwidth": "100G",
+      "distance_km": 101.51083358313365,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "西安市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 1232.248018141736,
+      "latency_ms": 6.2
+    },
+    {
+      "source": "西安市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 955.0196982440149,
+      "latency_ms": 4.8
+    },
+    {
+      "source": "西安市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 649.5334489129478,
+      "latency_ms": 3.2
+    },
+    {
+      "source": "西安市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 434.2375977897894,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "西安市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 1535.8700067380662,
+      "latency_ms": 7.7
+    },
+    {
+      "source": "西安市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 457.34158225015335,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "西安市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 1280.769524109505,
+      "latency_ms": 6.4
+    },
+    {
+      "source": "西安市",
+      "target": "陕西省",
+      "bandwidth": "100G",
+      "distance_km": 120.57915764908441,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "西安市",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "100G",
+      "distance_km": 2215.6629642784415,
+      "latency_ms": 11.1
+    },
+    {
+      "source": "西安市",
+      "target": "青海省",
+      "bandwidth": "100G",
+      "distance_km": 1177.677780340368,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "重庆市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 1310.1678912001262,
+      "latency_ms": 6.6
+    },
+    {
+      "source": "重庆市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 1365.3082547861472,
+      "latency_ms": 6.8
+    },
+    {
+      "source": "重庆市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 625.0458994081635,
+      "latency_ms": 3.1
+    },
+    {
+      "source": "重庆市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 730.7356672320385,
+      "latency_ms": 3.7
+    },
+    {
+      "source": "重庆市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 1911.0791768408249,
+      "latency_ms": 9.6
+    },
+    {
+      "source": "重庆市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 457.34158225015335,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "重庆市",
+      "target": "广州市",
+      "bandwidth": "400G",
+      "distance_km": 934.0991007464854,
+      "latency_ms": 4.7
+    },
+    {
+      "source": "重庆市",
+      "target": "广西壮族自治区",
+      "bandwidth": "100G",
+      "distance_km": 696.9030459328715,
+      "latency_ms": 3.5
+    },
+    {
+      "source": "重庆市",
+      "target": "海南省",
+      "bandwidth": "100G",
+      "distance_km": 1372.6645312502133,
+      "latency_ms": 6.9
+    },
+    {
+      "source": "重庆市",
+      "target": "云南省",
+      "bandwidth": "100G",
+      "distance_km": 845.5057625440057,
+      "latency_ms": 4.2
+    },
+    {
+      "source": "重庆市",
+      "target": "贵州省",
+      "bandwidth": "100G",
+      "distance_km": 372.3649342172531,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "广州市",
+      "target": "上海市",
+      "bandwidth": "400G",
+      "distance_km": 1174.6554480018146,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "广州市",
+      "target": "北京市",
+      "bandwidth": "400G",
+      "distance_km": 1888.3810612855457,
+      "latency_ms": 9.4
+    },
+    {
+      "source": "广州市",
+      "target": "武汉市",
+      "bandwidth": "400G",
+      "distance_km": 812.0451031508181,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "广州市",
+      "target": "郑州市",
+      "bandwidth": "400G",
+      "distance_km": 1252.028961515963,
+      "latency_ms": 6.3
+    },
+    {
+      "source": "广州市",
+      "target": "沈阳市",
+      "bandwidth": "400G",
+      "distance_km": 2263.4711350338093,
+      "latency_ms": 11.3
+    },
+    {
+      "source": "广州市",
+      "target": "西安市",
+      "bandwidth": "400G",
+      "distance_km": 1280.769524109505,
+      "latency_ms": 6.4
+    },
+    {
+      "source": "广州市",
+      "target": "重庆市",
+      "bandwidth": "400G",
+      "distance_km": 934.0991007464854,
+      "latency_ms": 4.7
+    },
+    {
+      "source": "广州市",
+      "target": "台湾省",
+      "bandwidth": "100G",
+      "distance_km": 759.1963782733994,
+      "latency_ms": 3.8
+    },
+    {
+      "source": "广州市",
+      "target": "广西壮族自治区",
+      "bandwidth": "100G",
+      "distance_km": 487.96784361335244,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "广州市",
+      "target": "海南省",
+      "bandwidth": "100G",
+      "distance_km": 692.5319253388234,
+      "latency_ms": 3.5
+    },
+    {
+      "source": "广州市",
+      "target": "广东省",
+      "bandwidth": "100G",
+      "distance_km": 13.113691083615219,
+      "latency_ms": 0.1
+    },
+    {
+      "source": "广州市",
+      "target": "澳门特别行政区",
+      "bandwidth": "100G",
+      "distance_km": 129.36012472847779,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "广州市",
+      "target": "香港特别行政区",
+      "bandwidth": "100G",
+      "distance_km": 122.12408933864886,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "广州市",
+      "target": "贵州省",
+      "bandwidth": "100G",
+      "distance_km": 775.092514159956,
+      "latency_ms": 3.9
+    },
+    {
+      "source": "陕西省",
+      "target": "西安市",
+      "bandwidth": "100G",
+      "distance_km": 120.57915764908441,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "陕西省",
+      "target": "榆林市",
+      "bandwidth": "10G",
+      "distance_km": 321.95975932658433,
+      "latency_ms": 1.6
+    },
+    {
+      "source": "陕西省",
+      "target": "庆阳市",
+      "bandwidth": "10G",
+      "distance_km": 158.07199278230956,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "陕西省",
+      "target": "天水市",
+      "bandwidth": "10G",
+      "distance_km": 292.44378808638197,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "陕西省",
+      "target": "中卫市",
+      "bandwidth": "10G",
+      "distance_km": 364.36200436738636,
+      "latency_ms": 1.8
+    },
+    {
+      "source": "陕西省",
+      "target": "洛阳市",
+      "bandwidth": "10G",
+      "distance_km": 306.31159474268696,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "陕西省",
+      "target": "甘南藏族自治州",
+      "bandwidth": "10G",
+      "distance_km": 567.1142268490241,
+      "latency_ms": 2.8
+    },
+    {
+      "source": "台湾省",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 759.1963782733994,
+      "latency_ms": 3.8
+    },
+    {
+      "source": "台湾省",
+      "target": "福州市",
+      "bandwidth": "10G",
+      "distance_km": 311.1931139497017,
+      "latency_ms": 1.6
+    },
+    {
+      "source": "台湾省",
+      "target": "南平市",
+      "bandwidth": "10G",
+      "distance_km": 488.9718735482004,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "广西壮族自治区",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 487.96784361335244,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "广西壮族自治区",
+      "target": "重庆市",
+      "bandwidth": "100G",
+      "distance_km": 696.9030459328715,
+      "latency_ms": 3.5
+    },
+    {
+      "source": "广西壮族自治区",
+      "target": "南宁市",
+      "bandwidth": "10G",
+      "distance_km": 90.87551403970598,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "山西省",
+      "target": "郑州市",
+      "bandwidth": "100G",
+      "distance_km": 343.7190736700919,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "山西省",
+      "target": "北京市",
+      "bandwidth": "100G",
+      "distance_km": 460.5241544417608,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "山西省",
+      "target": "邯郸市",
+      "bandwidth": "10G",
+      "distance_km": 230.16452887782464,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "山西省",
+      "target": "榆林市",
+      "bandwidth": "10G",
+      "distance_km": 245.35006752289388,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "山西省",
+      "target": "呼和浩特市",
+      "bandwidth": "10G",
+      "distance_km": 342.05190781286564,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "山西省",
+      "target": "庆阳市",
+      "bandwidth": "10G",
+      "distance_km": 447.18987112990845,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "海南省",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 692.5319253388234,
+      "latency_ms": 3.5
+    },
+    {
+      "source": "海南省",
+      "target": "重庆市",
+      "bandwidth": "100G",
+      "distance_km": 1372.6645312502133,
+      "latency_ms": 6.9
+    },
+    {
+      "source": "海南省",
+      "target": "琼海市",
+      "bandwidth": "10G",
+      "distance_km": 149.47437696113894,
+      "latency_ms": 0.7
+    },
+    {
+      "source": "海南省",
+      "target": "三沙市",
+      "bandwidth": "10G",
+      "distance_km": 960.988941151628,
+      "latency_ms": 4.8
+    },
+    {
+      "source": "河南省",
+      "target": "郑州市",
+      "bandwidth": "100G",
+      "distance_km": 83.60084137916171,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "河南省",
+      "target": "荆州市",
+      "bandwidth": "10G",
+      "distance_km": 442.0659666398225,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "河南省",
+      "target": "安阳市",
+      "bandwidth": "10G",
+      "distance_km": 231.3542783107311,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "河南省",
+      "target": "洛阳市",
+      "bandwidth": "10G",
+      "distance_km": 152.97648528303677,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "河北省",
+      "target": "北京市",
+      "bandwidth": "100G",
+      "distance_km": 74.6913134272225,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "河北省",
+      "target": "天津市",
+      "bandwidth": "100G",
+      "distance_km": 107.69344922516164,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "河北省",
+      "target": "德州市",
+      "bandwidth": "10G",
+      "distance_km": 258.8053245307502,
+      "latency_ms": 1.3
+    },
+    {
+      "source": "天津市",
+      "target": "北京市",
+      "bandwidth": "100G",
+      "distance_km": 128.11505584402286,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "天津市",
+      "target": "河北省",
+      "bandwidth": "100G",
+      "distance_km": 107.69344922516164,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "天津市",
+      "target": "德州市",
+      "bandwidth": "10G",
+      "distance_km": 234.32804161619677,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "天津市",
+      "target": "烟台市",
+      "bandwidth": "10G",
+      "distance_km": 377.4981125057028,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "天津市",
+      "target": "潍坊市",
+      "bandwidth": "10G",
+      "distance_km": 339.2310000917129,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "西安市",
+      "bandwidth": "100G",
+      "distance_km": 2215.6629642784415,
+      "latency_ms": 11.1
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "北屯市",
+      "bandwidth": "10G",
+      "distance_km": 715.5849006455671,
+      "latency_ms": 3.6
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "可克达拉市",
+      "bandwidth": "10G",
+      "distance_km": 483.1738815845405,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "昌吉回族自治州",
+      "bandwidth": "10G",
+      "distance_km": 456.0964405482724,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "双河市",
+      "bandwidth": "10G",
+      "distance_km": 476.90233678972294,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "新疆维吾尔自治区",
+      "target": "和田地区",
+      "bandwidth": "10G",
+      "distance_km": 581.7752867996735,
+      "latency_ms": 2.9
+    },
+    {
+      "source": "黑龙江省",
+      "target": "沈阳市",
+      "bandwidth": "100G",
+      "distance_km": 737.6265349956587,
+      "latency_ms": 3.7
+    },
+    {
+      "source": "黑龙江省",
+      "target": "伊春市",
+      "bandwidth": "10G",
+      "distance_km": 109.19164660829948,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "黑龙江省",
+      "target": "辽源市",
+      "bandwidth": "10G",
+      "distance_km": 594.0212141850142,
+      "latency_ms": 3.0
+    },
+    {
+      "source": "江苏省",
+      "target": "上海市",
+      "bandwidth": "100G",
+      "distance_km": 270.6748261312832,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "江苏省",
+      "target": "武汉市",
+      "bandwidth": "100G",
+      "distance_km": 552.0934724207198,
+      "latency_ms": 2.8
+    },
+    {
+      "source": "江苏省",
+      "target": "泰州市",
+      "bandwidth": "10G",
+      "distance_km": 68.87553518504305,
+      "latency_ms": 0.3
+    },
+    {
+      "source": "江苏省",
+      "target": "扬州市",
+      "bandwidth": "10G",
+      "distance_km": 25.381947036087517,
+      "latency_ms": 0.1
+    },
+    {
+      "source": "江苏省",
+      "target": "马鞍山市",
+      "bandwidth": "10G",
+      "distance_km": 181.25873131402383,
+      "latency_ms": 0.9
+    },
+    {
+      "source": "江苏省",
+      "target": "南昌市",
+      "bandwidth": "10G",
+      "distance_km": 582.3559340788429,
+      "latency_ms": 2.9
+    },
+    {
+      "source": "广东省",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 13.113691083615219,
+      "latency_ms": 0.1
+    },
+    {
+      "source": "广东省",
+      "target": "武汉市",
+      "bandwidth": "100G",
+      "distance_km": 815.908525964375,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "广东省",
+      "target": "湘潭市",
+      "bandwidth": "10G",
+      "distance_km": 496.79894779332557,
+      "latency_ms": 2.5
+    },
+    {
+      "source": "广东省",
+      "target": "长沙市",
+      "bandwidth": "10G",
+      "distance_km": 545.6207906677914,
+      "latency_ms": 2.7
+    },
+    {
+      "source": "澳门特别行政区",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 129.36012472847779,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "澳门特别行政区",
+      "target": "武汉市",
+      "bandwidth": "100G",
+      "distance_km": 940.68230081408,
+      "latency_ms": 4.7
+    },
+    {
+      "source": "香港特别行政区",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 122.12408933864886,
+      "latency_ms": 0.6
+    },
+    {
+      "source": "香港特别行政区",
+      "target": "武汉市",
+      "bandwidth": "100G",
+      "distance_km": 914.1168894486834,
+      "latency_ms": 4.6
+    },
+    {
+      "source": "云南省",
+      "target": "重庆市",
+      "bandwidth": "100G",
+      "distance_km": 845.5057625440057,
+      "latency_ms": 4.2
+    },
+    {
+      "source": "云南省",
+      "target": "保山市",
+      "bandwidth": "10G",
+      "distance_km": 253.92141367280124,
+      "latency_ms": 1.3
+    },
+    {
+      "source": "青海省",
+      "target": "西安市",
+      "bandwidth": "100G",
+      "distance_km": 1177.677780340368,
+      "latency_ms": 5.9
+    },
+    {
+      "source": "青海省",
+      "target": "拉萨市",
+      "bandwidth": "10G",
+      "distance_km": 777.5350645596823,
+      "latency_ms": 3.9
+    },
+    {
+      "source": "青海省",
+      "target": "果洛藏族自治州",
+      "bandwidth": "10G",
+      "distance_km": 353.8447031547854,
+      "latency_ms": 1.8
+    },
+    {
+      "source": "内蒙古自治区",
+      "target": "北京市",
+      "bandwidth": "100G",
+      "distance_km": 480.2922134240726,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "内蒙古自治区",
+      "target": "包头市",
+      "bandwidth": "10G",
+      "distance_km": 412.8838865423314,
+      "latency_ms": 2.1
+    },
+    {
+      "source": "贵州省",
+      "target": "重庆市",
+      "bandwidth": "100G",
+      "distance_km": 372.3649342172531,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "贵州省",
+      "target": "广州市",
+      "bandwidth": "100G",
+      "distance_km": 775.092514159956,
+      "latency_ms": 3.9
+    },
+    {
+      "source": "贵州省",
+      "target": "湘西土家族苗族自治州",
+      "bandwidth": "10G",
+      "distance_km": 349.89183706318903,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "贵州省",
+      "target": "恩施土家族苗族自治州",
+      "bandwidth": "10G",
+      "distance_km": 456.6328582841632,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "贵州省",
+      "target": "毕节市",
+      "bandwidth": "10G",
+      "distance_km": 167.55939700839286,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "贵州省",
+      "target": "娄底市",
+      "bandwidth": "10G",
+      "distance_km": 480.14893415693336,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "贵州省",
+      "target": "保山市",
+      "bandwidth": "10G",
+      "distance_km": 817.542042907975,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "贵州省",
+      "target": "邵阳市",
+      "bandwidth": "10G",
+      "distance_km": 397.6082661998304,
+      "latency_ms": 2.0
+    },
+    {
+      "source": "贵州省",
+      "target": "益阳市",
+      "bandwidth": "10G",
+      "distance_km": 537.3079854412354,
+      "latency_ms": 2.7
+    },
+    {
+      "source": "安徽省",
+      "target": "武汉市",
+      "bandwidth": "100G",
+      "distance_km": 305.30219050488824,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "安徽省",
+      "target": "咸宁市",
+      "bandwidth": "10G",
+      "distance_km": 380.7053096156498,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "安徽省",
+      "target": "扬州市",
+      "bandwidth": "10G",
+      "distance_km": 234.66875200407816,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "安徽省",
+      "target": "马鞍山市",
+      "bandwidth": "10G",
+      "distance_km": 109.98124267962135,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "安徽省",
+      "target": "南平市",
+      "bandwidth": "10G",
+      "distance_km": 505.1458489007448,
+      "latency_ms": 2.5
+    },
+    {
+      "source": "安徽省",
+      "target": "南昌市",
+      "bandwidth": "10G",
+      "distance_km": 370.76807784210905,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "安徽省",
+      "target": "岳阳市",
+      "bandwidth": "10G",
+      "distance_km": 488.9368588531435,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "安徽省",
+      "target": "杭州市",
+      "bandwidth": "10G",
+      "distance_km": 302.7688420896727,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "安徽省",
+      "target": "亳州市",
+      "bandwidth": "10G",
+      "distance_km": 203.70708592843943,
+      "latency_ms": 1.0
+    },
+    {
+      "source": "辽宁省",
+      "target": "沈阳市",
+      "bandwidth": "100G",
+      "distance_km": 101.51083358313365,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "辽宁省",
+      "target": "通化市",
+      "bandwidth": "10G",
+      "distance_km": 289.578750928706,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "辽宁省",
+      "target": "葫芦岛市",
+      "bandwidth": "10G",
+      "distance_km": 214.15628528964507,
+      "latency_ms": 1.1
+    },
+    {
+      "source": "辽宁省",
+      "target": "吉林市",
+      "bandwidth": "10G",
+      "distance_km": 433.1687767635281,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "辽宁省",
+      "target": "锦州市",
+      "bandwidth": "10G",
+      "distance_km": 84.70329458782518,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "辽宁省",
+      "target": "大连市",
+      "bandwidth": "10G",
+      "distance_km": 190.8830647473546,
+      "latency_ms": 1.0
+    },
+    {
+      "source": "辽宁省",
+      "target": "辽源市",
+      "bandwidth": "10G",
+      "distance_km": 281.8127670854233,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "邯郸市",
+      "target": "山西省",
+      "bandwidth": "10G",
+      "distance_km": 230.16452887782464,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "泰州市",
+      "target": "江苏省",
+      "bandwidth": "10G",
+      "distance_km": 68.87553518504305,
+      "latency_ms": 0.3
+    },
+    {
+      "source": "北屯市",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "10G",
+      "distance_km": 715.5849006455671,
+      "latency_ms": 3.6
+    },
+    {
+      "source": "南宁市",
+      "target": "广西壮族自治区",
+      "bandwidth": "10G",
+      "distance_km": 90.87551403970598,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "咸宁市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 380.7053096156498,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "咸宁市",
+      "target": "长沙市",
+      "bandwidth": "10G",
+      "distance_km": 184.15731017975872,
+      "latency_ms": 0.9
+    },
+    {
+      "source": "德州市",
+      "target": "天津市",
+      "bandwidth": "10G",
+      "distance_km": 234.32804161619677,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "德州市",
+      "target": "河北省",
+      "bandwidth": "10G",
+      "distance_km": 258.8053245307502,
+      "latency_ms": 1.3
+    },
+    {
+      "source": "扬州市",
+      "target": "江苏省",
+      "bandwidth": "10G",
+      "distance_km": 25.381947036087517,
+      "latency_ms": 0.1
+    },
+    {
+      "source": "扬州市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 234.66875200407816,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "扬州市",
+      "target": "马鞍山市",
+      "bandwidth": "10G",
+      "distance_km": 160.55078863371202,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "福州市",
+      "target": "台湾省",
+      "bandwidth": "10G",
+      "distance_km": 311.1931139497017,
+      "latency_ms": 1.6
+    },
+    {
+      "source": "荆州市",
+      "target": "河南省",
+      "bandwidth": "10G",
+      "distance_km": 442.0659666398225,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "通化市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 289.578750928706,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "葫芦岛市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 214.15628528964507,
+      "latency_ms": 1.1
+    },
+    {
+      "source": "葫芦岛市",
+      "target": "锦州市",
+      "bandwidth": "10G",
+      "distance_km": 150.6887739377743,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "湘西土家族苗族自治州",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 349.89183706318903,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "吉林市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 433.1687767635281,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "吉林市",
+      "target": "辽源市",
+      "bandwidth": "10G",
+      "distance_km": 151.38701886053505,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "湘潭市",
+      "target": "广东省",
+      "bandwidth": "10G",
+      "distance_km": 496.79894779332557,
+      "latency_ms": 2.5
+    },
+    {
+      "source": "湘潭市",
+      "target": "长沙市",
+      "bandwidth": "10G",
+      "distance_km": 77.10017131213215,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "恩施土家族苗族自治州",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 456.6328582841632,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "榆林市",
+      "target": "山西省",
+      "bandwidth": "10G",
+      "distance_km": 245.35006752289388,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "榆林市",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 321.95975932658433,
+      "latency_ms": 1.6
+    },
+    {
+      "source": "烟台市",
+      "target": "天津市",
+      "bandwidth": "10G",
+      "distance_km": 377.4981125057028,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "呼和浩特市",
+      "target": "山西省",
+      "bandwidth": "10G",
+      "distance_km": 342.05190781286564,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "琼海市",
+      "target": "海南省",
+      "bandwidth": "10G",
+      "distance_km": 149.47437696113894,
+      "latency_ms": 0.7
+    },
+    {
+      "source": "毕节市",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 167.55939700839286,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "伊春市",
+      "target": "黑龙江省",
+      "bandwidth": "10G",
+      "distance_km": 109.19164660829948,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "娄底市",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 480.14893415693336,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "娄底市",
+      "target": "长沙市",
+      "bandwidth": "10G",
+      "distance_km": 160.85678921113546,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "锦州市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 84.70329458782518,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "锦州市",
+      "target": "葫芦岛市",
+      "bandwidth": "10G",
+      "distance_km": 150.6887739377743,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "保山市",
+      "target": "云南省",
+      "bandwidth": "10G",
+      "distance_km": 253.92141367280124,
+      "latency_ms": 1.3
+    },
+    {
+      "source": "保山市",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 817.542042907975,
+      "latency_ms": 4.1
+    },
+    {
+      "source": "安阳市",
+      "target": "河南省",
+      "bandwidth": "10G",
+      "distance_km": 231.3542783107311,
+      "latency_ms": 1.2
+    },
+    {
+      "source": "庆阳市",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 158.07199278230956,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "庆阳市",
+      "target": "山西省",
+      "bandwidth": "10G",
+      "distance_km": 447.18987112990845,
+      "latency_ms": 2.2
+    },
+    {
+      "source": "天水市",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 292.44378808638197,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "邵阳市",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 397.6082661998304,
+      "latency_ms": 2.0
+    },
+    {
+      "source": "拉萨市",
+      "target": "青海省",
+      "bandwidth": "10G",
+      "distance_km": 777.5350645596823,
+      "latency_ms": 3.9
+    },
+    {
+      "source": "马鞍山市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 109.98124267962135,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "马鞍山市",
+      "target": "江苏省",
+      "bandwidth": "10G",
+      "distance_km": 181.25873131402383,
+      "latency_ms": 0.9
+    },
+    {
+      "source": "马鞍山市",
+      "target": "扬州市",
+      "bandwidth": "10G",
+      "distance_km": 160.55078863371202,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "可克达拉市",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "10G",
+      "distance_km": 483.1738815845405,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "大连市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 190.8830647473546,
+      "latency_ms": 1.0
+    },
+    {
+      "source": "包头市",
+      "target": "内蒙古自治区",
+      "bandwidth": "10G",
+      "distance_km": 412.8838865423314,
+      "latency_ms": 2.1
+    },
+    {
+      "source": "中卫市",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 364.36200436738636,
+      "latency_ms": 1.8
+    },
+    {
+      "source": "南平市",
+      "target": "台湾省",
+      "bandwidth": "10G",
+      "distance_km": 488.9718735482004,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "南平市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 505.1458489007448,
+      "latency_ms": 2.5
+    },
+    {
+      "source": "洛阳市",
+      "target": "河南省",
+      "bandwidth": "10G",
+      "distance_km": 152.97648528303677,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "洛阳市",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 306.31159474268696,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "南昌市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 370.76807784210905,
+      "latency_ms": 1.9
+    },
+    {
+      "source": "南昌市",
+      "target": "江苏省",
+      "bandwidth": "10G",
+      "distance_km": 582.3559340788429,
+      "latency_ms": 2.9
+    },
+    {
+      "source": "辽源市",
+      "target": "辽宁省",
+      "bandwidth": "10G",
+      "distance_km": 281.8127670854233,
+      "latency_ms": 1.4
+    },
+    {
+      "source": "辽源市",
+      "target": "黑龙江省",
+      "bandwidth": "10G",
+      "distance_km": 594.0212141850142,
+      "latency_ms": 3.0
+    },
+    {
+      "source": "辽源市",
+      "target": "吉林市",
+      "bandwidth": "10G",
+      "distance_km": 151.38701886053505,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "三沙市",
+      "target": "海南省",
+      "bandwidth": "10G",
+      "distance_km": 960.988941151628,
+      "latency_ms": 4.8
+    },
+    {
+      "source": "甘南藏族自治州",
+      "target": "陕西省",
+      "bandwidth": "10G",
+      "distance_km": 567.1142268490241,
+      "latency_ms": 2.8
+    },
+    {
+      "source": "岳阳市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 488.9368588531435,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "岳阳市",
+      "target": "长沙市",
+      "bandwidth": "10G",
+      "distance_km": 93.53636910348345,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "杭州市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 302.7688420896727,
+      "latency_ms": 1.5
+    },
+    {
+      "source": "益阳市",
+      "target": "贵州省",
+      "bandwidth": "10G",
+      "distance_km": 537.3079854412354,
+      "latency_ms": 2.7
+    },
+    {
+      "source": "长沙市",
+      "target": "广东省",
+      "bandwidth": "10G",
+      "distance_km": 545.6207906677914,
+      "latency_ms": 2.7
+    },
+    {
+      "source": "长沙市",
+      "target": "咸宁市",
+      "bandwidth": "10G",
+      "distance_km": 184.15731017975872,
+      "latency_ms": 0.9
+    },
+    {
+      "source": "长沙市",
+      "target": "湘潭市",
+      "bandwidth": "10G",
+      "distance_km": 77.10017131213215,
+      "latency_ms": 0.4
+    },
+    {
+      "source": "长沙市",
+      "target": "娄底市",
+      "bandwidth": "10G",
+      "distance_km": 160.85678921113546,
+      "latency_ms": 0.8
+    },
+    {
+      "source": "长沙市",
+      "target": "岳阳市",
+      "bandwidth": "10G",
+      "distance_km": 93.53636910348345,
+      "latency_ms": 0.5
+    },
+    {
+      "source": "亳州市",
+      "target": "安徽省",
+      "bandwidth": "10G",
+      "distance_km": 203.70708592843943,
+      "latency_ms": 1.0
+    },
+    {
+      "source": "昌吉回族自治州",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "10G",
+      "distance_km": 456.0964405482724,
+      "latency_ms": 2.3
+    },
+    {
+      "source": "潍坊市",
+      "target": "天津市",
+      "bandwidth": "10G",
+      "distance_km": 339.2310000917129,
+      "latency_ms": 1.7
+    },
+    {
+      "source": "双河市",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "10G",
+      "distance_km": 476.90233678972294,
+      "latency_ms": 2.4
+    },
+    {
+      "source": "和田地区",
+      "target": "新疆维吾尔自治区",
+      "bandwidth": "10G",
+      "distance_km": 581.7752867996735,
+      "latency_ms": 2.9
+    },
+    {
+      "source": "果洛藏族自治州",
+      "target": "青海省",
+      "bandwidth": "10G",
+      "distance_km": 353.8447031547854,
+      "latency_ms": 1.8
+    }
+  ]
+}
