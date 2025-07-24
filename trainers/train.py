@@ -12,6 +12,8 @@ from torch.nn import MultiheadAttention
 from tqdm import tqdm
 import json
 from utils.metrics_utils import MetricsLogger
+from utils.visualize_embeddings import extract_embeddings, plot_tsne
+from utils.model_utils import ModelSaver
 
 
 def train_model(cfg):
@@ -72,7 +74,7 @@ def train_model(cfg):
     )
 
     # 5) 构建融合后的分类器头（Multi‑Task）
-    fused_dim = 64   # GNN 64 + Transformer 64
+    fused_dim = 64  # GNN 64 + Transformer 64
     shared = nn.Sequential(nn.Linear(fused_dim, 128), nn.ReLU())
     head_root = nn.Linear(128, 2)
     head_true = nn.Linear(128, 2)
@@ -155,5 +157,21 @@ def train_model(cfg):
         avg_metrics = {'root': avg_root, 'true': avg_true}
         logger.add(epoch, avg_metrics)
 
-    #生成metrics数据json
+    # utils-> model_utils: 训练结束后保存神经网络模型数据
+    saver = ModelSaver(output_dir='data/processed/model')
+    saved = saver.save(gnn=gnn, at=at)
+    print(f"Models saved: {saved}")
+
+    # utils-> plot_metrics: 生成metrics数据json
     logger.save()
+
+    # utils-> visualize_embeddings 绘制聚类效果图
+    # 提取 embeddings 和标签
+    embs, is_root, is_true = extract_embeddings(cfg, gnn, at, topo_ds, alarm_ds)
+    # 根源 vs 衍生
+    plot_tsne(embs, is_root, 't-SNE: Root vs Derived', "tsne_root_vs_derived", names=('Derived', 'Root'))
+    # 真故障根源 vs 非真故障根源
+    mask_root = is_root == 1
+    plot_tsne(embs[mask_root], is_true[mask_root], 't-SNE: True Fault among Root',
+              "tsne_true_among_root", names=('Non-Fault', 'True Fault'))
+

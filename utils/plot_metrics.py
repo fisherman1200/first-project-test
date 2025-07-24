@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""
+r"""
 plot_metrics.py
 
 通用绘图脚本，根据指定 JSON 文件里的多项训练指标（如 loss, accuracy, lr 等），
 按用户指定的 key 列表生成对应的曲线图。
 
-使用方法：根目录终端运行
-    python .\utils\plot_metrics.py \
+使用方法：在项目根目录终端运行：
+    python ./utils/plot_metrics.py \
       --input metrics.json \
       --keys root,true \
       --output loss_curves.pdf
 
-    python .\utils\plot_metrics.py --keys root,true
+    python ./utils/plot_metrics.py --keys root,true
 
 如果不指定 --output，将默认生成在 data/processed/ 下，
 文件名为 "metrics_<YYYYMMDD_HHMMSS>.pdf"；
@@ -79,7 +79,7 @@ def plot_selected(data: dict, keys: list, output_path: str):
 def main():
     parser = argparse.ArgumentParser(description="Plot selected training metrics.")
     parser.add_argument(
-        '--input', '-i', type=str, default='data/metrics.json',
+        '--input', '-i', type=str, default='data/raw/metrics.json',
         help='Path to JSON file containing metrics'
     )
     parser.add_argument(
@@ -102,7 +102,7 @@ def main():
 
     # 生成默认输出目录和文件名
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    default_dir = os.path.join('data', 'processed')
+    default_dir = os.path.join('data', 'processed', 'metrics')
     if args.output is None:
         filename = f'metrics_{timestamp}.pdf'
     else:
