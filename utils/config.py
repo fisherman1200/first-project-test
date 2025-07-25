@@ -10,8 +10,11 @@ class DataConfig:
     alarm_path: str
     batch_size: int
     max_len: int
-    window_minutes: int
-    step_minutes: int
+    window_milliseconds: float
+    step_milliseconds: float
+    num_train: int
+    num_val: int
+    num_test: int
 
 
 @dataclass
@@ -36,6 +39,8 @@ class TrainingConfig:
     epochs: int
     lr: float
     weight_decay: float
+    lr_step_size: int
+    early_stop_patience: int
 
 
 @dataclass
@@ -57,5 +62,7 @@ def load_config(path: str = "configs/config.yaml") -> Config:
             epochs=int(cfg['training']['epochs']),
             lr=float(cfg['training']['lr']),
             weight_decay=float(cfg['training']['weight_decay']),
+            lr_step_size=int(cfg['training']['lr_step_size']),
+            early_stop_patience=int(cfg['training']['early_stop_patience'])
         ),
     )
