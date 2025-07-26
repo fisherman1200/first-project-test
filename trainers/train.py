@@ -19,6 +19,9 @@ from torch.cuda.amp import autocast, GradScaler
 
 
 def train_model(cfg):
+    # 启动gpu
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Device:", device)
     # 1) 加载网络拓扑数据
     topo_ds = TopologyDataset(cfg.data.topo_path)
     x_dict, edge_index_dict, edge_attr_dict = topo_ds[0]
@@ -42,7 +45,12 @@ def train_model(cfg):
         hidden_channels=cfg.gnn.hidden_channels,
         dropout=cfg.gnn.dropout,
         num_layers=cfg.gnn.num_layers
-    )
+    ).to(device)
+
+    # 把 x_dict 中所有张量移到 device
+    x_dict = {k: v.to(device) for k, v in x_dict.items()}
+    edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
+    edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
 
     # 预计算一次所有节点的 embedding
     with torch.no_grad():  # 不要为它建图
@@ -69,7 +77,7 @@ def train_model(cfg):
         nlayers=cfg.transformer.nlayers,
         max_len=cfg.transformer.max_len,
         dropout=cfg.transformer.dropout
-    )
+    ).to(device)
 
     #  定义跨模态注意力 & 门控网络
     cross_attn = MultiheadAttention(embed_dim=64, num_heads=4, dropout=0.3)
@@ -85,6 +93,10 @@ def train_model(cfg):
     shared = nn.Sequential(nn.Linear(fused_dim, 128), nn.ReLU())
     head_root = nn.Linear(128, 2)
     head_true = nn.Linear(128, 2)
+
+    # 全部迁移到 GPU
+    for m in [cross_attn, gate_net, shared, head_root, head_true]:
+        m.to(device)
 
     optimizer = Adam(
         list(gnn.parameters()) +
@@ -123,6 +135,7 @@ def train_model(cfg):
         print(f"------------------Epoch :{epoch:02d},Start------------------")
         for batch in tqdm(train_loader, desc=f"Epoch {epoch}"):
             optimizer.zero_grad()
+            batch = {k: v.to(device) for k, v in batch.items()}
             with autocast():  # 自动混合精度上下文
                 # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
                 # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
@@ -190,6 +203,7 @@ def train_model(cfg):
         total_val_loss, total_val_root_loss, total_val_true_loss = 0.0, 0.0, 0.0
         with torch.no_grad():
             for batch in tqdm(val_loader, desc=f"Epoch {epoch}"):
+                batch = {k: v.to(device) for k, v in batch.items()}
                 # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
                 # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
                 seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]
@@ -295,6 +309,7 @@ def train_model(cfg):
     total_samples = 0
     with torch.no_grad():
         for batch in test_loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
             # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
             # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
             seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]

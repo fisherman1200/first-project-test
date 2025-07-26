@@ -47,13 +47,14 @@ plt.rcParams.update({
 
 
 def extract_embeddings(cfg, gnn, at, topo_ds, alarm_ds):
+    device = next(gnn.parameters()).device  # 自动获取 GNN 模型所在设备
     # 1) 预计算节点嵌入
     gnn.eval()
     with torch.no_grad():
         h_dict = gnn(
-            topo_ds.x_dict,
-            topo_ds.edge_index_dict,
-            topo_ds.edge_attr_dict
+            {k: v.to(device) for k, v in topo_ds.x_dict.items()},
+            {k: v.to(device) for k, v in topo_ds.edge_index_dict.items()},
+            {k: v.to(device) for k, v in topo_ds.edge_attr_dict.items()}
         )
     # 合并并加 PAD
     h_core = h_dict['core']; h_agg = h_dict['agg']; h_access = h_dict['access']
