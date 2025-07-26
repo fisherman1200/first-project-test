@@ -354,7 +354,7 @@ def train_model(cfg):
             else:
                 loss_true = torch.tensor(0.0, device=fused.device)
             test_loss = loss_root + 2.0 * loss_true
-            total_test_loss += loss.item() * batch_size
+            total_test_loss += test_loss.item() * batch_size
             total_samples += batch_size
 
     print(f"Final TEST Loss: {total_test_loss / total_samples:.4f}")
