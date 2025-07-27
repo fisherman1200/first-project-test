@@ -129,148 +129,97 @@ def train_model(cfg):
     # utils-> model_utils: 训练结束后保存神经网络模型数据
     saver = ModelSaver(base_dir='data/processed')
 
+    # --------- Helper Functions ---------
+
+    def forward_batch(batch):
+        # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
+        # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
+        seq_node_embs = node_embs[batch['node_idxs']]# [B, L, 64]
+        # 对序列维度做平均，得到 [B, 64]
+        node_feat = seq_node_embs.mean(dim=1)
+
+        # 6.2 Transformer 嵌入
+        # batch['text_feat'] 已经是 [B, L, feat_dim]，直接送入
+        text_feat = at(batch['text_feat'])# [B, 64]
+
+        # 6.3 Cross-Attention 融合
+        # 构造序列：2 tokens × B samples × 64 dim
+        seq = torch.stack([node_feat, text_feat], dim=0)# [2, B, 64]
+        attn_out, _ = cross_attn(seq, seq, seq)# [2, B, 64]
+        # 取两 token 的平均作为跨模态输出
+        attn_fused = attn_out.mean(dim=0)# [B, 64]
+
+        # 6.4 Gating Mechanism 融合
+        cat = torch.cat([node_feat, text_feat], dim=-1)# [B, 128]
+        gate = gate_net(cat) # [B, 1] in (0,1)
+        fused = gate * attn_fused + (1 - gate) * text_feat# [B, 64]
+
+        # 6.5 Multi-Task Head
+        z = shared(fused)# [B, 128]
+        out_root = head_root(z)# [B, 2]
+        out_true = head_true(z)# [B, 2]
+        return out_root, out_true
+
+    def compute_loss(out_root, out_true, batch):
+        root_label = batch['is_root'][:, 0]# [B]
+        true_label = batch['is_true_fault'][:, 0]# [B]
+        loss_root = F.cross_entropy(out_root, root_label)
+        mask = root_label == 1
+        if mask.any():
+            loss_true = F.cross_entropy(out_true[mask], true_label[mask])
+        else:
+            loss_true = out_root.new_tensor(0.0)
+        return loss_root + 2.0 * loss_true, loss_root, loss_true
+
+    def run_epoch(loader, train=True):
+        modules = [at, shared, gate_net, head_root, head_true, cross_attn]
+        for m in modules:
+            m.train() if train else m.eval()
+        total_loss = total_root = total_true = 0.0
+        context = autocast if train else torch.no_grad
+        for batch in tqdm(loader, desc='Train' if train else 'Val'):
+            batch = {k: v.to(device) for k, v in batch.items()}
+            with context():
+                out_root, out_true = forward_batch(batch)
+                loss, l_root, l_true = compute_loss(out_root, out_true, batch)
+            if train:
+                # 6.6 反向传播
+                optimizer.zero_grad()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            total_loss += loss.item()
+            total_root += l_root.item()
+            total_true += l_true.item()
+        n = len(loader)
+        return total_loss / n, total_root / n, total_true / n
+
+
     # 6) 训练循环
     for epoch in range(cfg.training.epochs):
-        total_train_loss, total_train_root_loss, total_train_true_loss = 0.0, 0.0, 0.0
-        print(f"------------------Epoch :{epoch:02d},Start------------------")
-        for batch in tqdm(train_loader, desc=f"Epoch {epoch}"):
-            optimizer.zero_grad()
-            batch = {k: v.to(device) for k, v in batch.items()}
-            with autocast():  # 自动混合精度上下文
-                # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
-                # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
-                seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]
-                # 对序列维度做平均，得到 [B, 64]
-                node_feat = seq_node_embs.mean(dim=1)
-
-                # 6.2 Transformer 嵌入
-                # batch['text_feat'] 已经是 [B, L, feat_dim]，直接送入
-                text_feat = at(batch['text_feat'])  # [B, 64]
-
-                # 6.3 Cross-Attention 融合
-                # 构造序列：2 tokens × B samples × 64 dim
-                seq = torch.stack([node_feat, text_feat], dim=0)  # [2, B, 64]
-                attn_out, _ = cross_attn(seq, seq, seq)  # [2, B, 64]
-                # 取两 token 的平均作为跨模态输出
-                attn_fused = attn_out.mean(dim=0)  # [B, 64]
-                # h = torch.cat([node_feat, text_feat], dim=-1)  # [B, fused_dim]
-
-                # 6.4 Gating Mechanism 融合
-                cat = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
-                gate = gate_net(cat)  # [B, 1] in (0,1)
-                # fused = gate * node_feat + (1 - gate) * text_feat  # [B, 64]
-                # —— 或者用 attn_fused 参与 gating：
-                fused = gate * attn_fused + (1 - gate) * text_feat
-
-                # 6.5 Multi-Task Head
-                z = shared(fused)  # [B, 128]
-                out_root = head_root(z)  # [B, 2]
-                out_true = head_true(z)  # [B, 2]
-
-                # 6) 损失
-                is_root_seq = batch['is_root']  # [B, L]
-                is_true_seq_fault = batch['is_true_fault']  # [B, L]
-                # 取第一个元素
-                root_label = is_root_seq[:, 0]  # [B]
-                true_label = is_true_seq_fault[:, 0]  # [B]
-                loss_root = F.cross_entropy(out_root, root_label)
-                mask = (root_label == 1)
-                if mask.any():
-                    loss_true = F.cross_entropy(out_true[mask], true_label[mask])
-                else:
-                    loss_true = torch.tensor(0.0, device=fused.device)
-                loss = loss_root + 2.0 * loss_true
-
-            total_train_loss += loss.item()
-            total_train_root_loss += loss_root.item()
-            total_train_true_loss += loss_true.item()
-
-            # 6.6 反向传播
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-        avg_train_loss = total_train_loss / len(train_loader)
-        avg_train_root = total_train_root_loss / len(train_loader)
-        avg_train_true = total_train_true_loss / len(train_loader)
-        print(
-            f"Train_loss={avg_train_loss:.4f} | Train_loss_root={avg_train_root:.4f} | Train_loss_true={avg_train_true:.4f}")
+        #---- Train ----
+        train_loss, train_root, train_true = run_epoch(train_loader, train=True)
+        print(f"Train_loss={train_loss:.4f} | Train_loss_root={train_root:.4f} | Train_loss_true={train_true:.4f}")
 
         # ---- Validation ----
-        gnn.eval()
-        at.eval()
-        shared.eval()
-        total_val_loss, total_val_root_loss, total_val_true_loss = 0.0, 0.0, 0.0
-        with torch.no_grad():
-            for batch in tqdm(val_loader, desc=f"Epoch {epoch}"):
-                batch = {k: v.to(device) for k, v in batch.items()}
-                # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
-                # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
-                seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]
-                # 对序列维度做平均，得到 [B, 64]
-                node_feat = seq_node_embs.mean(dim=1)
-
-                # 6.2 Transformer 嵌入
-                # batch['text_feat'] 已经是 [B, L, feat_dim]，直接送入
-                text_feat = at(batch['text_feat'])  # [B, 64]
-
-                # 6.3 Cross-Attention 融合
-                # 构造序列：2 tokens × B samples × 64 dim
-                seq = torch.stack([node_feat, text_feat], dim=0)  # [2, B, 64]
-                attn_out, _ = cross_attn(seq, seq, seq)  # [2, B, 64]
-                # 取两 token 的平均作为跨模态输出
-                attn_fused = attn_out.mean(dim=0)  # [B, 64]
-                # h = torch.cat([node_feat, text_feat], dim=-1)  # [B, fused_dim]
-
-                # 6.4 Gating Mechanism 融合
-                cat = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
-                gate = gate_net(cat)  # [B, 1] in (0,1)
-                # fused = gate * node_feat + (1 - gate) * text_feat  # [B, 64]
-                # —— 或者用 attn_fused 参与 gating：
-                fused = gate * attn_fused + (1 - gate) * text_feat
-
-                # 6.5 Multi-Task Head
-                z = shared(fused)  # [B, 128]
-                out_root = head_root(z)  # [B, 2]
-                out_true = head_true(z)  # [B, 2]
-
-                # 6) 损失
-                is_root_seq = batch['is_root']  # [B, L]
-                is_true_seq_fault = batch['is_true_fault']  # [B, L]
-                # 取第一个元素
-                root_label = is_root_seq[:, 0]  # [B]
-                true_label = is_true_seq_fault[:, 0]  # [B]
-                loss_root = F.cross_entropy(out_root, root_label)
-                mask = (root_label == 1)
-                if mask.any():
-                    loss_true = F.cross_entropy(out_true[mask], true_label[mask])
-                else:
-                    loss_true = torch.tensor(0.0, device=fused.device)
-                val_loss = loss_root + 2.0 * loss_true
-
-            total_val_loss += val_loss.item()
-            total_val_root_loss += loss_root.item()
-            total_val_true_loss += loss_true.item()
-
-        avg_val_loss = total_val_loss / len(val_loader)
-        avg_val_root = total_val_root_loss / len(val_loader)
-        avg_val_true = total_val_true_loss / len(val_loader)
-        print(f"Val_loss={avg_val_loss:.4f} | Val_loss_root={avg_val_root:.4f} | Val_loss_true={avg_val_true:.4f}")
-        print(f"------------------Epoch :{epoch:02d},End------------------")
+        val_loss, val_root, val_true = run_epoch(val_loader, train=False)
+        print(f"Val_loss={val_loss:.4f} | Val_loss_root={val_root:.4f} | Val_loss_true={val_true:.4f}")
 
         #  添加到 logger
-        avg_metrics = {'train_loss': avg_train_loss,
-                       'train_root_loss': avg_train_root,
-                       'train_true_loss': avg_train_true,
-                       'val_loss': avg_val_loss,
-                       'val_root_loss': avg_val_root,
-                       'val_true_loss': avg_val_true}
+        avg_metrics = {
+            'train_loss': train_loss,
+            'train_root_loss': train_root,
+            'train_true_loss': train_true,
+            'val_loss': val_loss,
+            'val_root_loss': val_root,
+            'val_true_loss': val_true,
+        }
         logger.add(epoch, avg_metrics)
 
         # —— Scheduler & Early Stopping ——
         scheduler.step()
-        if avg_val_loss < best_val:
-            best_val = avg_val_loss
+        if val_loss < best_val:
+            best_val = val_loss
             no_improve_times = 0
             saved = saver.save_best(gnn=gnn, at=at)
         else:
@@ -298,66 +247,13 @@ def train_model(cfg):
         dropout=cfg.transformer.dropout
     )
     best_at.load_state_dict(torch.load(saved['at']))
-    best_gnn.eval()
-    best_at.eval()
+    best_gnn.eval(); best_at.eval()
 
     # 测试评估
     print(f"Test dataset size: {len(test_ds)}")
     print(f"Number of test batches: {len(test_loader)}")
-
-    total_test_loss = 0.0
-    total_samples = 0
-    with torch.no_grad():
-        for batch in test_loader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
-            # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
-            seq_node_embs = node_embs[batch['node_idxs']]  # [B, L, 64]
-            batch_size = seq_node_embs.size(0)  # 当前这个 batch 的样本数 B
-            # 对序列维度做平均，得到 [B, 64]
-            node_feat = seq_node_embs.mean(dim=1)
-
-            # 6.2 Transformer 嵌入
-            # batch['text_feat'] 已经是 [B, L, feat_dim]，直接送入
-            text_feat = at(batch['text_feat'])  # [B, 64]
-
-            # 6.3 Cross-Attention 融合
-            # 构造序列：2 tokens × B samples × 64 dim
-            seq = torch.stack([node_feat, text_feat], dim=0)  # [2, B, 64]
-            attn_out, _ = cross_attn(seq, seq, seq)  # [2, B, 64]
-            # 取两 token 的平均作为跨模态输出
-            attn_fused = attn_out.mean(dim=0)  # [B, 64]
-            # h = torch.cat([node_feat, text_feat], dim=-1)  # [B, fused_dim]
-
-            # 6.4 Gating Mechanism 融合
-            cat = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
-            gate = gate_net(cat)  # [B, 1] in (0,1)
-            # fused = gate * node_feat + (1 - gate) * text_feat  # [B, 64]
-            # —— 或者用 attn_fused 参与 gating：
-            fused = gate * attn_fused + (1 - gate) * text_feat
-
-            # 6.5 Multi-Task Head
-            z = shared(fused)  # [B, 128]
-            out_root = head_root(z)  # [B, 2]
-            out_true = head_true(z)  # [B, 2]
-
-            # 6) 损失
-            is_root_seq = batch['is_root']  # [B, L]
-            is_true_seq_fault = batch['is_true_fault']  # [B, L]
-            # 取第一个元素
-            root_label = is_root_seq[:, 0]  # [B]
-            true_label = is_true_seq_fault[:, 0]  # [B]
-            loss_root = F.cross_entropy(out_root, root_label)
-            mask = (root_label == 1)
-            if mask.any():
-                loss_true = F.cross_entropy(out_true[mask], true_label[mask])
-            else:
-                loss_true = torch.tensor(0.0, device=fused.device)
-            test_loss = loss_root + 2.0 * loss_true
-            total_test_loss += loss.item() * batch_size
-            total_samples += batch_size
-
-    print(f"Final TEST Loss: {total_test_loss / total_samples:.4f}")
+    test_loss, _, _ = run_epoch(test_loader, train=False)
+    print(f"Final TEST Loss: {test_loss:.4f}")
     # 也可以计算 accuracy、precision/recall 等指标
 
     # —— 可视化 & 其他后处理 ——
