@@ -41,6 +41,8 @@ class TrainingConfig:
     weight_decay: float
     lr_step_size: int
     early_stop_patience: int
+    focal_alpha : float
+    focal_gamma : float
 
 
 @dataclass
@@ -63,6 +65,8 @@ def load_config(path: str = "configs/config.yaml") -> Config:
             lr=float(cfg['training']['lr']),
             weight_decay=float(cfg['training']['weight_decay']),
             lr_step_size=int(cfg['training']['lr_step_size']),
-            early_stop_patience=int(cfg['training']['early_stop_patience'])
+            early_stop_patience=int(cfg['training']['early_stop_patience']),
+            focal_alpha=float(cfg['training']['focal_alpha']),
+            focal_gamma=float(cfg['training']['focal_gamma']),
         ),
     )

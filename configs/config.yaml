@@ -29,3 +29,5 @@ training:
   weight_decay: 1e-5
   lr_step_size: 10
   early_stop_patience : 3
+  focal_alpha: 2.0
+  focal_gamma: 2.0

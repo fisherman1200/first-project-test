@@ -16,6 +16,7 @@ from utils.visualize_embeddings import extract_embeddings, plot_tsne
 from utils.model_utils import ModelSaver
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
 from torch.cuda.amp import autocast, GradScaler
+from trainers.losses import FocalLoss
 
 
 def train_model(cfg):
@@ -129,6 +130,8 @@ def train_model(cfg):
     # utils-> model_utils: 训练结束后保存神经网络模型数据
     saver = ModelSaver(base_dir='data/processed')
 
+    # 实例化Focal Losses， 减少样本不平衡的影响
+    focal_loss_fn = FocalLoss(alpha=cfg.training.focal_alpha, gamma=cfg.training.focal_gamma)
     # --------- Helper Functions ---------
 
     def forward_batch(batch):
@@ -166,7 +169,8 @@ def train_model(cfg):
         loss_root = F.cross_entropy(out_root, root_label)
         mask = root_label == 1
         if mask.any():
-            loss_true = F.cross_entropy(out_true[mask], true_label[mask])
+            # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
+            loss_true = focal_loss_fn(out_true[mask], true_label[mask])
         else:
             loss_true = out_root.new_tensor(0.0)
         return loss_root + 2.0 * loss_true, loss_root, loss_true
@@ -196,14 +200,23 @@ def train_model(cfg):
 
 
     # 6) 训练循环
-    for epoch in range(cfg.training.epochs):
-        #---- Train ----
+    # 使用 tqdm 进度条显示每个 epoch 的平均损失
+    epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch")
+    for epoch in epoch_bar:
+        # ---- Train ----
         train_loss, train_root, train_true = run_epoch(train_loader, train=True)
-        print(f"Train_loss={train_loss:.4f} | Train_loss_root={train_root:.4f} | Train_loss_true={train_true:.4f}")
-
         # ---- Validation ----
         val_loss, val_root, val_true = run_epoch(val_loader, train=False)
-        print(f"Val_loss={val_loss:.4f} | Val_loss_root={val_root:.4f} | Val_loss_true={val_true:.4f}")
+
+        # 在进度条尾部显示当前 epoch 的各项损失
+        epoch_bar.set_postfix({
+            "train_loss": f"{train_loss:.4f}",
+            "train_root": f"{train_root:.4f}",
+            "train_true": f"{train_true:.4f}",
+            "val_loss": f"{val_loss:.4f}",
+            "val_root": f"{val_root:.4f}",
+            "val_true": f"{val_true:.4f}"
+        })
 
         #  添加到 logger
         avg_metrics = {
@@ -225,7 +238,7 @@ def train_model(cfg):
         else:
             no_improve_times += 1
             if no_improve_times >= cfg.training.early_stop_patience:
-                print(f"Early stopping at epoch {epoch}")
+                epoch_bar.write(f"Early stopping at epoch {epoch}")
                 break
 
     # —— 训练 & 验证 结束后，加载最佳模型权重，再对 test_loader 评估一次 ——
