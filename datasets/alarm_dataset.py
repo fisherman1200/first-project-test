@@ -8,56 +8,57 @@ import numpy as np
 from transformers import RobertaTokenizer, RobertaModel
 from sklearn.preprocessing import LabelEncoder
 import torch.nn as nn
-
 import os
-
-# 1) 定位到 datasets 目录
-base_dir = os.path.dirname(os.path.abspath(__file__))
-# 2) 顶层项目根目录
-proj_root = os.path.abspath(os.path.join(base_dir, os.pardir))
-# 3) 构造 topo_graph.json 和 alarms.json 的绝对路径
-topo_json = os.path.join(proj_root, 'data', 'topo_graph.json')
-alarm_json = os.path.join(proj_root, 'data', 'alarms.json')
 
 
 class AlarmDataset(Dataset):
     """
-    返回：
-    node_idxs:  类型：LongTensor，形状 [L]，这里 L = max_len
-                含义：序列中每条告警对应的网络拓扑节点的索引。比如窗口里第0个告警发生在 “上海市”，
-                在 TopologyDataset 里我们把 “上海市” 映射成节点10，那么 node_idxs[0] = 10；
-                如果序列被填充（padding），多余的位置就重复最后一个合法节点索引或填 0。
-    text_feat:  类型：FloatTensor，形状 [L, D]，其中 D 是每条告警的特征维度（如 alarm_type的one‑hot 维度 + severity + timestamp）。
-                含义：将告警的文本/数值字段编码成向量，
-                通常包括：
-                    告警类型（alarm_type）的 One‑Hot 编码
-                    严重度（severity）映射成数值（如 Critical=2, Major=1, Minor=0）
-                    时间戳（timestamp）归一化后的实数
-    is_root:
-    is_true_fault:
-    """
+        AlarmDataset: 从告警日志中构建时序事件序列，生成节点索引、文本特征和标签。
 
+        输入参数:
+          json_path (str): 原始告警日志 JSON 路径，GBK 编码
+          node_id_map (Dict[str,int]): 拓扑节点 ID -> 索引（1 开始，0 保留为 PAD）,通常由topo_dataset得到
+          max_len (int): 每个时间窗口序列的最大长度 L
+          window_milliseconds (int): 粗聚集时间窗口大小（毫秒）
+          step_milliseconds (int): 精细滑动步长（毫秒）
+          preproc_path (str): 预处理缓存文件路径，若存在则直接加载
+
+        输出样本 (dict) 字段:
+          'node_idxs': LongTensor([L]) 序列内每条告警对应的节点索引
+          'text_feat': FloatTensor([L, D]) 每条告警的文本+数值+嵌入特征
+          'is_root': LongTensor([L]) 每条告警是否为根源 (0/1)
+          'is_true_fault': LongTensor([L]) 每条根源告警是否为真实故障 (0/1)
+
+        使用方法示例:
+          ds = AlarmDataset("data/alarms.json", node_id_map, max_len=16,
+                            window_milliseconds=5000, step_milliseconds=500)
+          sample = ds[0]
+          node_idxs, text_feat, is_root, is_true = (
+              sample['node_idxs'], sample['text_feat'],
+              sample['is_root'], sample['is_true_fault'])
+    """
     def __init__(self, json_path, node_id_map, max_len=16,
                  window_milliseconds=5000, step_milliseconds=500,
                  preproc_path='data/processed/processed_alarm_sequences.pt'):
         if os.path.exists(preproc_path):
             # 直接加载预处理好的 sequences 列表
             self.samples = torch.load(preproc_path)
-            print(f"Loaded {len(self.samples)} preprocessed samples from {preproc_path}")
+            print(f"在 {preproc_path} 发现预处理过的文件，读取 {len(self.samples)} 条数据")
         else:
+            print(f"没有在 {preproc_path} 找到预处理过的数据，开始预处理数据")
             # 如果外面给的 map 为空或坐标对不上，就自己从 topo_graph.json 里读
             if node_id_map is None or not node_id_map:
-                with open(topo_json, 'r', encoding='utf-8-sig') as f:
+                with open(json_path, 'r', encoding='utf-8-sig') as f:
                     topo = json.load(f)
                 # 建立一个干净的 map：ID -> idx+1
                 node_id_map = {n['id'].strip(): i + 1
                                for i, n in enumerate(topo['nodes'])}
             self.node_id_map = node_id_map
             self.max_len = max_len
-            # Load raw alarms (GBK encoding for Chinese)
+            # 读取原始日志
             with open(json_path, 'r', encoding='gbk') as f:
                 raw = json.load(f)
-            # Parse timestamps and sort
+            # 解析并排序
             print(f"读取了 {len(raw)} 条告警日志")
             alarms = []
             for item in raw:
@@ -66,20 +67,18 @@ class AlarmDataset(Dataset):
                 alarms.append(item)
             alarms.sort(key=lambda x: x['_ts'])
 
-            # Sliding window
+            # 滑动窗口聚类
             # 预先提取所有时间戳
             timestamps = [a['_ts'] for a in alarms]  # 有序
 
-            # —— 阶段1：粗聚集 (事件簇) ——
+            # 粗聚集：基于 window_milliseconds
             clusters = []
             for i, t0 in enumerate(timestamps):
                 j = bisect.bisect_right(timestamps, t0 + timedelta(milliseconds=window_milliseconds))
                 if j > i:
                     clusters.append(alarms[i:j])
 
-            print(f"Found {len(clusters)} coarse clusters (events)")
-
-            # —— 阶段2：精细划窗或 pairwise 检测 ——
+            # 细滑窗：基于 step_milliseconds
             sequences = []
             for cluster in clusters:
                 # cluster 已是一个事件簇的所有告警
@@ -88,8 +87,6 @@ class AlarmDataset(Dataset):
                     m = bisect.bisect_right(ts_cluster, t1 + timedelta(milliseconds=step_milliseconds))
                     if m > k:
                         sequences.append(cluster[k:m])
-
-            print(f"Expanded to {len(sequences)} fine sequences")
 
             '''更改：从one-hot到RoBERTa
             # Build global type encoder
@@ -109,8 +106,9 @@ class AlarmDataset(Dataset):
             # 如果有 GPU，可将模型移动到 GPU
             if torch.cuda.is_available():
                 self.text_encoder.to('cuda')
-            # —— 新增：node_name 和 device_id 的 LabelEncoder + Embedding ——
-            # 先从 raw alarms 里收集所有可能的值
+            # 特征维度 = RoBERTa(768) + severity&ts(2) + node_name_emb(32) + dev_id_emb(32)
+            self.feat_dim = 768 + 2 + 32 + 32
+            # 节点与设备唯一值嵌入
             all_node_names = sorted({a['node_name'].strip() for a in raw})
             all_device_ids = sorted({a['device_id'] for a in raw})
             self.le_node = LabelEncoder().fit(all_node_names)
@@ -123,12 +121,10 @@ class AlarmDataset(Dataset):
                 self.node_emb.to('cuda')
                 self.dev_emb.to('cuda')
             # ---------------------------更改：从one-hot到RoBERTa---------------------------
-
-            # Build samples: pad/truncate each sequence
+            # 构建样本列表
             self.samples = []
             for seq in sequences:
                 node_idxs, feats, root_labels, true_labels = [], [], [], []
-
                 for a in seq:
                     # —— 1) 先做一下清洗 ——
                     raw_name = a.get('node_name', '')
@@ -151,7 +147,7 @@ class AlarmDataset(Dataset):
                     '''
                     # ---------------------------更改：从one-hot到RoBERTa---------------------------
                     # —— 新：用 RoBERTa 提取深度语义 ——
-                    # —— 1) 文本 Embedding ——
+                    # —— 文本 Embedding ——
                     alarm_text = f"{a['alarm_type']}。{a.get('comment', '')}"
                     inputs = self.tokenizer(
                         alarm_text,
@@ -169,18 +165,18 @@ class AlarmDataset(Dataset):
                     cls_emb = outputs.last_hidden_state[:, 0, :].squeeze(0)
                     text_emb = cls_emb  # torch tensor [768,]
 
-                    # —— 2) severity 和 timestamp ——
+                    # ——  severity 和 timestamp ——
                     sev_map = {'Critical': 2, 'Major': 1, 'Minor': 0}
                     sev = sev_map.get(a['severity'], 0)
                     ts_norm = a['_ts'].timestamp() / 1e9
 
-                    # —— 3) node_name & device_id Embedding ——
+                    # ——  node_name & device_id Embedding ——
                     nidx = self.le_node.transform([a['node_name'].strip()])[0]
                     didx = self.le_dev.transform([a['device_id']])[0]
                     node_v = self.node_emb(torch.tensor(nidx, device=text_emb.device))
                     dev_v = self.dev_emb(torch.tensor(didx, device=text_emb.device))
 
-                    # —— 4) concat 所有特征 ——
+                    # ——  concat 所有特征 ——
                     # [768] ∥ [1] ∥ [1] ∥ [32] ∥ [32] → [834]
                     feat = torch.cat([
                         text_emb,
@@ -233,28 +229,37 @@ class AlarmDataset(Dataset):
                     'is_root': torch.tensor(root_labels, dtype=torch.long),
                     'is_true_fault': torch.tensor(true_labels, dtype=torch.long)
                 })
-            # … 原来完整的预处理逻辑 …
-            # 最后把 self.samples 填好后再保存：
+
+            # # 缓存到磁盘，下次直接加载：
             torch.save(self.samples, preproc_path)
-            print(f"No cache found, preprocessed and saved {len(self.samples)} samples to {preproc_path}")
+            print(f"预处理完成，保存了 {len(self.samples)} 条数据在 {preproc_path}")
 
 
     def __len__(self):
+        """返回样本数"""
         return len(self.samples)
 
     def __getitem__(self, idx):
+        """
+               按索引返回单条样本:
+                   node_idxs: LongTensor([L])
+                   text_feat: FloatTensor([L, D])
+                   is_root: LongTensor([L])
+                   is_true_fault: LongTensor([L])
+               """
         return self.samples[idx]
 
 
+# 脚本测试
 if __name__ == '__main__':
-    with open(topo_json, 'r', encoding='utf-8') as f:
+    with open('../data/topo_graph.json', 'r', encoding='utf-8') as f:
         topo = json.load(f)
     # 建立一个干净的 map：ID -> idx+1
     node_id_map = {n['id'].strip(): i + 1
                    for i, n in enumerate(topo['nodes'])}
 
     # 构建并导出 AlarmDataset
-    ds = AlarmDataset(alarm_json, node_id_map, max_len=16, window_milliseconds=5000, step_milliseconds=500)
+    ds = AlarmDataset('../data/alarms.json', node_id_map, max_len=16, window_milliseconds=5000, step_milliseconds=500)
 
     out = []
     for sample in ds:
@@ -266,13 +271,12 @@ if __name__ == '__main__':
         })
 
     # 导出到 data/processed_alarm_sequences.json
-    output_path = os.path.join(proj_root, 'data', 'processed_alarm_sequences.json')
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open('../data/processed_alarm_sequences.json', 'w', encoding='utf-8') as f:
         import json
 
         json.dump(out, f, ensure_ascii=False, indent=2)
 
-    print(f"已导出 {len(out)} 条告警序列到 {output_path}")
+    print(f"已导出 {len(out)} 条告警序列到 data/processed_alarm_sequences.json")
 
     # 统计 is_root 第一位为 1 的序列数
     count_root = sum(1 for seq in out if seq['is_root'][0] == 1)

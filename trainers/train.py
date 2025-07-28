@@ -1,17 +1,14 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.optim import Adam
-from torch.utils.data import DataLoader, random_split
-
+from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from datasets.topo_dataset import TopologyDataset
 from datasets.alarm_dataset import AlarmDataset
 from models.gnn_transformer import GNNTransformer  # 用于节点级别嵌入
 from models.alarm_transformer import AlarmTransformer
 from torch.nn import MultiheadAttention
 from tqdm import tqdm
-import json
 from utils.metrics_utils import MetricsLogger
 from utils.visualize_embeddings import extract_embeddings, plot_tsne
 from utils.model_utils import ModelSaver
@@ -23,27 +20,43 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 
 def train_model(cfg):
-    # 启动gpu
+    # 启动gpu/cpu
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Device:", device)
-    # 1) 加载网络拓扑数据
+    print("目前训练使用的Device:", device)
+    # (1) 加载网络拓扑数据
     topo_ds = TopologyDataset(cfg.data.topo_path)
     x_dict, edge_index_dict, edge_attr_dict = topo_ds[0]
-    # node_ids 是真实节点的列表，对应的索引是 1..len(node_ids)
+    # 把所有张量移到同一个device，确保后续计算在相同的device上  TODO:优化一下to(device)，后面很多重复的
+    x_dict = {k: v.to(device) for k, v in x_dict.items()}
+    edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
+    edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
+    # node_ids 是真实节点的列表，对应的索引是 1..len(node_ids)，将0留给PAD
     node_map = {nid: idx + 1 for idx, nid in enumerate(topo_ds.node_ids)}
-    # 这样，node_map[...] 永远不会生成 0，0 被专门留给 PAD
 
-    # 2) 加载告警日志数据
+    # (2) 加载告警日志数据
     full_alarm_ds = AlarmDataset(cfg.data.alarm_path, node_map, max_len=cfg.data.max_len,
-                                 window_milliseconds=cfg.data.window_milliseconds, step_milliseconds=cfg.data.step_milliseconds)
-    # 划分训练集、验证集
-    train_ds, val_ds, test_ds = random_split(full_alarm_ds, [cfg.data.num_train, cfg.data.num_val, cfg.data.num_test],
+                                 window_milliseconds=cfg.data.window_milliseconds,
+                                 step_milliseconds=cfg.data.step_milliseconds)
+    # 划分训练集、验证集、测试集
+    train_ds, val_ds, test_ds = random_split(full_alarm_ds,
+                                             [cfg.data.num_train, cfg.data.num_val, cfg.data.num_test],
                                              generator=torch.Generator().manual_seed(42))
-    train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size, shuffle=True)
+
+    # ----- 使用WeightedRandomSampler加权采样解决正负样本不均衡 -----
+    # 统计训练集每条序列是否含根告警
+    train_labels = [full_alarm_ds[i]['is_root'].max().item() for i in train_ds.indices]
+    # 计算每个类别的权重：数量越少权重越大
+    class_count = np.bincount(train_labels)
+    class_weights = 1.0 / class_count
+    # 为每个样本分配相应权重
+    sample_weights = [class_weights[label] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
+    # 针对训练集中is_root=1的样本过采样
+    train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size, sampler=sampler)
     val_loader = DataLoader(val_ds, batch_size=cfg.data.batch_size, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size, shuffle=False)
 
-    # 3) 构建 GNN 编码器
+    # (3) 初始化GNN网络模型
     gnn = GNNTransformer(
         in_channels=topo_ds.feature_dim,
         hidden_channels=cfg.gnn.hidden_channels,
@@ -51,12 +64,7 @@ def train_model(cfg):
         num_layers=cfg.gnn.num_layers
     ).to(device)
 
-    # 把 x_dict 中所有张量移到 device
-    x_dict = {k: v.to(device) for k, v in x_dict.items()}
-    edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
-    edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
-
-    # 预计算一次所有节点的 embedding
+    # 预计算一次所有节点的 embedding, 特征提取器, 冻结GNN的参数  TODO:先在某个任务或自监督目标上训练好 GNN，现在GNN参数还是空白
     with torch.no_grad():  # 不要为它建图
         h_dict = gnn(x_dict, edge_index_dict, edge_attr_dict)
         h_core = h_dict['core']
@@ -66,15 +74,12 @@ def train_model(cfg):
                           dtype=h_core.dtype,
                           device=h_core.device)
         node_embs = torch.cat([pad, h_core, h_agg, h_access], dim=0)
-    # 确保 node_embs 上没有梯度关系
-    node_embs = node_embs.detach()
-    # 结果形状：[1+8+20+50, H] = [79, H]
+    # 确保 node_embs 上没有梯度关系, 结果形状[pad+num_core+num_agg+num_access, hidden_channels]
+    node_embs = node_embs.detach()  # e.g. [1+8+20+50, H] = [79, H]
 
-    # 4) 构建 Alarm Transformer
-    # text_feat 的 shape 是 [L, feat_dim]
-    feat_dim = full_alarm_ds[0]['text_feat'].shape[1]  # [B,L,feat_dim]
+    # (4) 初始化Transformer网络模型
     at = AlarmTransformer(
-        input_dim=full_alarm_ds[0]['text_feat'].shape[1],
+        input_dim=full_alarm_ds[0]['text_feat'].shape[1],  #  768 + 2 + 32 + 32 = 834
         emb_dim=cfg.transformer.emb_dim,
         nhead=cfg.transformer.nhead,
         hid_dim=cfg.transformer.hid_dim,
@@ -83,7 +88,7 @@ def train_model(cfg):
         dropout=cfg.transformer.dropout
     ).to(device)
 
-    #  定义跨模态注意力 & 门控网络
+    # (5.1) 定义跨模态注意力 & 门控网络
     cross_attn = MultiheadAttention(embed_dim=64, num_heads=4, dropout=0.3)
     gate_net = nn.Sequential(
         nn.Linear(64 * 2, 32),
@@ -92,16 +97,17 @@ def train_model(cfg):
         nn.Sigmoid()
     )
 
-    # 5) 构建融合后的分类器头（Multi‑Task）
+    # (5.2) 定义训练任务，构建融合后的分类器头（Multi‑Task）,先二分类根源告警,再区分故障的二元属性
     fused_dim = 64  # GNN 64 + Transformer 64
     shared = nn.Sequential(nn.Linear(fused_dim, 128), nn.ReLU())
     head_root = nn.Linear(128, 2)
     head_true = nn.Linear(128, 2)
 
-    # 全部迁移到 GPU
+    # 全部迁移到相同的gpu/cpu
     for m in [cross_attn, gate_net, shared, head_root, head_true]:
         m.to(device)
 
+    # (5.3) 定义训练优化目标
     optimizer = Adam(
         list(gnn.parameters()) +
         list(at.parameters()) +
@@ -114,44 +120,45 @@ def train_model(cfg):
         weight_decay=cfg.training.weight_decay
     )
 
-    # 选择一个 scheduler，学习率调度：
+    # 定义一个 scheduler，学习率调度：
     scheduler = StepLR(optimizer, step_size=cfg.training.lr_step_size, gamma=0.1)
     # scheduler = CosineAnnealingLR(optimizer, T_max=cfg.training.epochs, eta_min=1e-6)
     # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
-    # AMP
-    scaler = GradScaler()
-
-    # ————— 早停变量 —————
+    # 初始化训练早停(early stopping)变量
     best_val = float('inf')
     no_improve_times = 0
 
-    # 初始化 Logger，指定要记录的关键指标名
+    # (5.4) 初始化混合精度训练(AMP)
+    scaler = GradScaler()
+
+    # (5.5)初始化 Logger，指定要记录的关键指标名
     logger = MetricsLogger(keys=['train_loss', 'train_root_loss', 'train_true_loss',
                                  'val_loss', 'val_root_loss', 'val_true_loss',
                                  'train_acc', 'train_precision', 'train_recall', 'train_f1',
                                  'val_acc', 'val_precision', 'val_recall', 'val_f1'])  # 可扩充更多指标
 
-    # utils-> model_utils: 训练结束后保存神经网络模型数据
+    # (5.6)初始化保存模型参数的方法
     saver = ModelSaver(base_dir='data/processed')
 
-    # 实例化Focal Losses， 减少样本不平衡的影响
+    # (5.7)实例化Focal Losses， 减少样本不平衡的影响
     focal_loss_fn = FocalLoss(alpha=cfg.training.focal_alpha, gamma=cfg.training.focal_gamma)
-    # --------- Helper Functions ---------
 
+    # (6) 训练循环
+    # --------- Helper Functions ---------
     def forward_batch(batch):
+        """前向循环"""
         # 6.1 -- 从预计算的 node_embs 中抽出本批序列的 node 嵌入 --
-        # batch['node_idxs']: [B, L]，先取出对应节点的嵌入 [B, L, 64]
-        seq_node_embs = node_embs[batch['node_idxs']]# [B, L, 64]
-        # 对序列维度做平均，得到 [B, 64]
+        seq_node_embs = node_embs[batch['node_idxs']]# [batch_size, max_len, hidden_channels]
+        # 对序列维度做平均，得到 [batch_size, hidden_channels]
         node_feat = seq_node_embs.mean(dim=1)
 
         # 6.2 Transformer 嵌入
-        # batch['text_feat'] 已经是 [B, L, feat_dim]，直接送入
-        text_feat = at(batch['text_feat'])# [B, 64]
+        # batch['text_feat'] 已经是 [batch_size, max_len, feat_dim]，直接送入
+        text_feat = at(batch['text_feat'])# [batch_size, emb_dim]
 
         # 6.3 Cross-Attention 融合
-        # 构造序列：2 tokens × B samples × 64 dim
+        # 构造序列：2 tokens × B samples × 64 dim (hidden_channels = emb_dim = 64)
         seq = torch.stack([node_feat, text_feat], dim=0)# [2, B, 64]
         attn_out, _ = cross_attn(seq, seq, seq)# [2, B, 64]
         # 取两 token 的平均作为跨模态输出
@@ -169,9 +176,11 @@ def train_model(cfg):
         return out_root, out_true
 
     def compute_loss(out_root, out_true, batch):
+        """计算损失函数"""
         root_label = batch['is_root'].max(dim=1).values  # [B]
         true_label = batch['is_true_fault'].max(dim=1).values  # [B]
-        loss_root = F.cross_entropy(out_root, root_label)
+        # root 也使用 Focal Loss（或设置 class weight）
+        loss_root = focal_loss_fn(out_root, root_label)
         mask = root_label == 1
         if mask.any():
             # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
@@ -214,7 +223,6 @@ def train_model(cfg):
         f1 = f1_score(all_labels, all_preds, zero_division=0)
         return total_loss / n, total_root / n, total_true / n, acc, precision, recall, f1
 
-    # 6) 训练循环
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
