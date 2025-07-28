@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,7 +16,8 @@ from utils.metrics_utils import MetricsLogger
 from utils.visualize_embeddings import extract_embeddings, plot_tsne
 from utils.model_utils import ModelSaver
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast
+from torch.cuda.amp import GradScaler
 from trainers.losses import FocalLoss
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -167,8 +169,8 @@ def train_model(cfg):
         return out_root, out_true
 
     def compute_loss(out_root, out_true, batch):
-        root_label = batch['is_root'][:, 0]# [B]
-        true_label = batch['is_true_fault'][:, 0]# [B]
+        root_label = batch['is_root'].max(dim=1).values  # [B]
+        true_label = batch['is_true_fault'].max(dim=1).values  # [B]
         loss_root = F.cross_entropy(out_root, root_label)
         mask = root_label == 1
         if mask.any():
@@ -185,10 +187,10 @@ def train_model(cfg):
             m.train() if train else m.eval()
         total_loss = total_root = total_true = 0.0
         all_preds, all_labels = [], []
-        context = autocast if train else torch.no_grad
-        for batch in tqdm(loader, desc='Train' if train else 'Val'):
+        context = autocast('cuda', enabled=True) if train else torch.no_grad()
+        for batch in tqdm(loader, desc='Train' if train else 'Val',ncols=100, leave=False):
             batch = {k: v.to(device) for k, v in batch.items()}
-            with context():
+            with context:
                 out_root, out_true = forward_batch(batch)
                 loss, l_root, l_true = compute_loss(out_root, out_true, batch)
             if train:
@@ -202,7 +204,7 @@ def train_model(cfg):
             total_root += l_root.item()
             total_true += l_true.item()
             preds = out_root.argmax(dim=1).detach().cpu()
-            labels = batch['is_root'][:, 0].detach().cpu()
+            labels = batch['is_root'].max(dim=1).values.detach().cpu()
             all_preds.extend(preds.tolist())
             all_labels.extend(labels.tolist())
         n = len(loader)
@@ -214,26 +216,26 @@ def train_model(cfg):
 
     # 6) 训练循环
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
-    epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch")
+    epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
         # ---- Train ----
         train_loss, train_root, train_true, train_acc, train_prec, train_rec, train_f1 = run_epoch(train_loader, train=True)
         # ---- Validation ----
         val_loss, val_root, val_true, val_acc, val_prec, val_rec, val_f1 = run_epoch(val_loader, train=False)
 
-        # 在进度条尾部显示当前 epoch 的各项损失
-        epoch_bar.set_postfix({
-            "train_loss": f"{train_loss:.4f}",
-            "train_root": f"{train_root:.4f}",
-            "train_true": f"{train_true:.4f}",
-            "val_loss": f"{val_loss:.4f}",
-            "val_root": f"{val_root:.4f}",
-            "val_true": f"{val_true:.4f}",
-            "train_acc": f"{train_acc:.4f}",
-            "val_acc": f"{val_acc:.4f}",
-            "train_f1": f"{train_f1:.4f}",
-            "val_f1": f"{val_f1:.4f}"
-        })
+        # 在进度条尾部显示当前 epoch 的各项损失<在每个 epoch 末尾，拼一个想要的输出
+        post_str = (
+            f"Epoch {epoch}: \n"
+            f"Train_loss：loss={train_loss:.4f}, root={train_root:.4f}, true={train_true:.4f}  |  "
+            f"Val_loss：loss={val_loss:.4f}, root={val_root:.4f}, true={val_true:.4f}  |  \n"
+            f"acc：train={train_acc:.4f}, val={val_acc:.4f}  |  "
+            f"precision：train={train_prec:.4f}, val={val_prec:.4f}  |  "
+            f"recall：train={train_rec:.4f}, val={val_rec:.4f}  |  "
+            f"F1：train={train_f1:.4f}, val={val_f1:.4f}"
+        )
+        tqdm.write(post_str)  # → 直接输出完整一行，不会被截断
+        # 然后单独用 set_postfix_str：
+        # epoch_bar.set_postfix_str(post_str)
 
         #  添加到 logger
         avg_metrics = {
