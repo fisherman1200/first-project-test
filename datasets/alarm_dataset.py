@@ -57,11 +57,11 @@ class AlarmDataset(Dataset):
             self.max_len = max_len
             # 读取原始日志
             with open(json_path, 'r', encoding='gbk') as f:
-                raw = json.load(f)
+                raw_data = json.load(f)
             # 解析并排序
-            print(f"读取了 {len(raw)} 条告警日志")
+            print(f"读取了 {len(raw_data)} 条告警日志")
             alarms = []
-            for item in raw:
+            for item in raw_data:
                 ts = datetime.fromisoformat(item['timestamp'])
                 item['_ts'] = ts
                 alarms.append(item)
@@ -83,10 +83,10 @@ class AlarmDataset(Dataset):
             for cluster in clusters:
                 # cluster 已是一个事件簇的所有告警
                 ts_cluster = [a['_ts'] for a in cluster]
-                for k, t1 in enumerate(ts_cluster):
-                    m = bisect.bisect_right(ts_cluster, t1 + timedelta(milliseconds=step_milliseconds))
-                    if m > k:
-                        sequences.append(cluster[k:m])
+                for start_idx, ts_start in enumerate(ts_cluster):
+                    end_idx = bisect.bisect_right(ts_cluster, ts_start + timedelta(milliseconds=step_milliseconds))
+                    if end_idx > start_idx:
+                        sequences.append(cluster[start_idx:end_idx])
 
             '''更改：从one-hot到RoBERTa
             # Build global type encoder
@@ -109,8 +109,8 @@ class AlarmDataset(Dataset):
             # 特征维度 = RoBERTa(768) + severity&ts(2) + node_name_emb(32) + dev_id_emb(32)
             self.feat_dim = 768 + 2 + 32 + 32
             # 节点与设备唯一值嵌入
-            all_node_names = sorted({a['node_name'].strip() for a in raw})
-            all_device_ids = sorted({a['device_id'] for a in raw})
+            all_node_names = sorted({a['node_name'].strip() for a in raw_data})
+            all_device_ids = sorted({a['device_id'] for a in raw_data})
             self.le_node = LabelEncoder().fit(all_node_names)
             self.le_dev = LabelEncoder().fit(all_device_ids)
             # 定义 embedding 层
@@ -124,7 +124,7 @@ class AlarmDataset(Dataset):
             # 构建样本列表
             self.samples = []
             for seq in sequences:
-                node_idxs, feats, root_labels, true_labels = [], [], [], []
+                node_idxs, features, root_labels, true_labels = [], [], [], []
                 for a in seq:
                     # —— 1) 先做一下清洗 ——
                     raw_name = a.get('node_name', '')
@@ -184,7 +184,7 @@ class AlarmDataset(Dataset):
                         node_v,
                         dev_v
                     ], dim=0)
-                    feats.append(feat.detach().cpu().numpy())
+                    features.append(feat.detach().cpu().numpy())
                     # ---------------------------更改：从one-hot到RoBERTa---------------------------
 
                     # 构造标签
@@ -202,22 +202,22 @@ class AlarmDataset(Dataset):
                 pad_feat = np.zeros(self.feat_dim, dtype=float)
 
                 # pad/truncate 到 max_len
-                L = len(feats)
-                pad_n = max_len - L if L < max_len else 0
-                if L < max_len:
-                    feats.extend([pad_feat] * pad_n)
-                    node_idxs.extend([0] * pad_n)
-                    root_labels.extend([0] * pad_n)
-                    true_labels.extend([0] * pad_n)
-                elif L > max_len:
-                    feats = feats[:max_len]
+                seq_len = len(features)
+                pad_count = max_len - seq_len if seq_len < max_len else 0
+                if seq_len < max_len:
+                    features.extend([pad_feat] * pad_count)
+                    node_idxs.extend([0] * pad_count)
+                    root_labels.extend([0] * pad_count)
+                    true_labels.extend([0] * pad_count)
+                elif seq_len > max_len:
+                    features = features[:max_len]
                     node_idxs = node_idxs[:max_len]
                     root_labels = root_labels[:max_len]
                     true_labels = true_labels[:max_len]
 
                 # 新：先堆成大 numpy array，再 to torch
-                feats_arr = np.stack(feats, axis=0).astype(np.float32)  # shape [L, D]
-                text_feat_tensor = torch.from_numpy(feats_arr)  # torch.FloatTensor
+                features_arr = np.stack(features, axis=0).astype(np.float32)  # shape [L, D]
+                text_feat_tensor = torch.from_numpy(features_arr)  # torch.FloatTensor
 
                 node_idxs_arr = np.array(node_idxs, dtype=np.int64)  # [L]
                 node_idxs_tensor = torch.from_numpy(node_idxs_arr)

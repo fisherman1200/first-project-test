@@ -19,6 +19,10 @@ from trainers.losses import FocalLoss
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
+# TODO: 用混淆矩阵、ROC 曲线评估两任务的效果。
+# TODO: 定位，可解释性神经网络。
+
+
 def train_model(cfg):
     # 启动gpu/cpu
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -26,7 +30,7 @@ def train_model(cfg):
     # (1) 加载网络拓扑数据
     topo_ds = TopologyDataset(cfg.data.topo_path)
     x_dict, edge_index_dict, edge_attr_dict = topo_ds[0]
-    # 把所有张量移到同一个device，确保后续计算在相同的device上  TODO:优化一下to(device)，后面很多重复的
+    # 把所有张量移到同一个device，确保后续计算在相同的device上
     x_dict = {k: v.to(device) for k, v in x_dict.items()}
     edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
     edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
@@ -57,7 +61,7 @@ def train_model(cfg):
     test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size, shuffle=False)
 
     # (3) 初始化GNN网络模型
-    gnn = GNNTransformer(
+    gnn_model = GNNTransformer(
         in_channels=topo_ds.feature_dim,
         hidden_channels=cfg.gnn.hidden_channels,
         dropout=cfg.gnn.dropout,
@@ -66,7 +70,7 @@ def train_model(cfg):
 
     # 预计算一次所有节点的 embedding, 特征提取器, 冻结GNN的参数  TODO:先在某个任务或自监督目标上训练好 GNN，现在GNN参数还是空白
     with torch.no_grad():  # 不要为它建图
-        h_dict = gnn(x_dict, edge_index_dict, edge_attr_dict)
+        h_dict = gnn_model(x_dict, edge_index_dict, edge_attr_dict)
         h_core = h_dict['core']
         h_agg = h_dict['agg']
         h_access = h_dict['access']
@@ -78,7 +82,7 @@ def train_model(cfg):
     node_embs = node_embs.detach()  # e.g. [1+8+20+50, H] = [79, H]
 
     # (4) 初始化Transformer网络模型
-    at = AlarmTransformer(
+    alarm_transformer = AlarmTransformer(
         input_dim=full_alarm_ds[0]['text_feat'].shape[1],  #  768 + 2 + 32 + 32 = 834
         emb_dim=cfg.transformer.emb_dim,
         nhead=cfg.transformer.nhead,
@@ -89,8 +93,8 @@ def train_model(cfg):
     ).to(device)
 
     # (5.1) 定义跨模态注意力 & 门控网络
-    cross_attn = MultiheadAttention(embed_dim=64, num_heads=4, dropout=0.3)
-    gate_net = nn.Sequential(
+    cross_attention = MultiheadAttention(embed_dim=64, num_heads=4, dropout=0.3)
+    gating_net = nn.Sequential(
         nn.Linear(64 * 2, 32),
         nn.ReLU(),
         nn.Linear(32, 1),
@@ -104,15 +108,15 @@ def train_model(cfg):
     head_true = nn.Linear(128, 2)
 
     # 全部迁移到相同的gpu/cpu
-    for m in [cross_attn, gate_net, shared, head_root, head_true]:
+    for m in [cross_attention, gating_net, shared, head_root, head_true]:
         m.to(device)
 
     # (5.3) 定义训练优化目标
     optimizer = Adam(
-        list(gnn.parameters()) +
-        list(at.parameters()) +
-        list(cross_attn.parameters()) +
-        list(gate_net.parameters()) +
+        list(gnn_model.parameters()) +
+        list(alarm_transformer.parameters()) +
+        list(cross_attention.parameters()) +
+        list(gating_net.parameters()) +
         list(shared.parameters()) +
         list(head_root.parameters()) +
         list(head_true.parameters()),
@@ -155,24 +159,24 @@ def train_model(cfg):
 
         # 6.2 Transformer 嵌入
         # batch['text_feat'] 已经是 [batch_size, max_len, feat_dim]，直接送入
-        text_feat = at(batch['text_feat'])# [batch_size, emb_dim]
+        text_feat = alarm_transformer(batch['text_feat'])# [batch_size, emb_dim]
 
         # 6.3 Cross-Attention 融合
         # 构造序列：2 tokens × B samples × 64 dim (hidden_channels = emb_dim = 64)
         seq = torch.stack([node_feat, text_feat], dim=0)# [2, B, 64]
-        attn_out, _ = cross_attn(seq, seq, seq)# [2, B, 64]
+        attn_out, _ = cross_attention(seq, seq, seq)# [2, B, 64]
         # 取两 token 的平均作为跨模态输出
         attn_fused = attn_out.mean(dim=0)# [B, 64]
 
         # 6.4 Gating Mechanism 融合
-        cat = torch.cat([node_feat, text_feat], dim=-1)# [B, 128]
-        gate = gate_net(cat) # [B, 1] in (0,1)
-        fused = gate * attn_fused + (1 - gate) * text_feat# [B, 64]
+        concat_features = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
+        gate = gating_net(concat_features)  # [B, 1] in (0,1)
+        fused = gate * attn_fused + (1 - gate) * text_feat  # [B, 64]
 
         # 6.5 Multi-Task Head
-        z = shared(fused)# [B, 128]
-        out_root = head_root(z)# [B, 2]
-        out_true = head_true(z)# [B, 2]
+        shared_feat = shared(fused)# [B, 128]
+        out_root = head_root(shared_feat)# [B, 2]
+        out_true = head_true(shared_feat)# [B, 2]
         return out_root, out_true
 
     def compute_loss(out_root, out_true, batch):
@@ -191,7 +195,7 @@ def train_model(cfg):
 
     def run_epoch(loader, train=True):
         """运行一个 Epoch，返回损失和评估指标"""
-        modules = [at, shared, gate_net, head_root, head_true, cross_attn]
+        modules = [alarm_transformer, shared, gating_net, head_root, head_true, cross_attention]
         for m in modules:
             m.train() if train else m.eval()
         total_loss = total_root = total_true = 0.0
@@ -216,12 +220,12 @@ def train_model(cfg):
             labels = batch['is_root'].max(dim=1).values.detach().cpu()
             all_preds.extend(preds.tolist())
             all_labels.extend(labels.tolist())
-        n = len(loader)
+        num_batches = len(loader)
         acc = accuracy_score(all_labels, all_preds)
         precision = precision_score(all_labels, all_preds, zero_division=0)
         recall = recall_score(all_labels, all_preds, zero_division=0)
         f1 = f1_score(all_labels, all_preds, zero_division=0)
-        return total_loss / n, total_root / n, total_true / n, acc, precision, recall, f1
+        return total_loss / num_batches, total_root / num_batches, total_true / num_batches, acc, precision, recall, f1
 
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
@@ -269,7 +273,7 @@ def train_model(cfg):
         if val_loss < best_val:
             best_val = val_loss
             no_improve_times = 0
-            saved = saver.save_best(gnn=gnn, at=at)
+            saved = saver.save_best(gnn=gnn_model, at=alarm_transformer)
         else:
             no_improve_times += 1
             if no_improve_times >= cfg.training.early_stop_patience:
@@ -305,12 +309,12 @@ def train_model(cfg):
     # 也可以计算 accuracy、precision/recall 等指标
 
     # —— 可视化 & 其他后处理 ——
-    # utils-> plot_metrics: 生成metrics数据json  TODO:所有metrics都画在一张图上，要根据需求分开
+    # utils-> plot_metrics: 生成metrics数据json
     logger.save()
 
     # utils-> visualize_embeddings 绘制聚类效果图
     # 提取 embeddings 和标签
-    embs, is_root, is_true = extract_embeddings(cfg, gnn, at, topo_ds, full_alarm_ds)
+    embs, is_root, is_true = extract_embeddings(cfg, gnn_model, alarm_transformer, topo_ds, full_alarm_ds)
     # 根源 vs 衍生
     plot_tsne(embs, is_root, 't-SNE: Root vs Derived', "tsne_root_vs_derived", names=('Derived', 'Root'))
     # 真故障根源 vs 非真故障根源

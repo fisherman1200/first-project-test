@@ -73,13 +73,13 @@ class TopologyDataset(Dataset):
         for e in topo['edges']:
             s, t = e['source'], e['target']
             # 找到对应的节点类型
-            s_type = next(n['type'] for n in topo['nodes'] if n['id']==s)
-            t_type = next(n['type'] for n in topo['nodes'] if n['id']==t)
+            s_type = next(n['type'] for n in topo['nodes'] if n['id'] == s)
+            t_type = next(n['type'] for n in topo['nodes'] if n['id'] == t)
             rel = (s_type, 'to', t_type)
             # 获取在该类型子集里的索引，如果某个 ID 不在映射中则跳过
-            si = self.node_map[s_type].get(s, None)
-            ti = self.node_map[t_type].get(t, None)
-            if si is None or ti is None:
+            src_idx = self.node_map[s_type].get(s, None)
+            tgt_idx = self.node_map[t_type].get(t, None)
+            if src_idx is None or tgt_idx is None:
                 continue
 
             # 解析边特征
@@ -87,7 +87,7 @@ class TopologyDataset(Dataset):
             dist = float(e.get('distance_km', 0.0))
             delay = float(e.get('latency_ms', 0.0))
 
-            self.edge_index_dict.setdefault(rel, []).append([si, ti])
+            self.edge_index_dict.setdefault(rel, []).append([src_idx, tgt_idx])
             self.edge_attr_dict.setdefault(rel, []).append([bw, dist, delay])
 
         # 转 tensor

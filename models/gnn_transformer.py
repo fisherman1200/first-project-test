@@ -7,7 +7,17 @@ from torch.nn import MultiheadAttention
 
 
 class GNNTransformer(nn.Module):
+    """异构图卷积网络，输出各类型节点的表示。"""
     def __init__(self, in_channels, hidden_channels, num_layers=3, dropout=0.3):
+        """
+        构造函数：初始化异构图卷积网络与注意力层。
+
+        参数:
+            in_channels: 原始节点特征维度
+            hidden_channels: 输出与内部隐藏维度
+            num_layers: 卷积层数
+            dropout: Dropout 比例
+        """
         super().__init__()
         self.num_layers = num_layers
         self.dropout = dropout
@@ -43,16 +53,26 @@ class GNNTransformer(nn.Module):
             self.convs.append(conv)
 
     def forward(self, x_dict, edge_index_dict, edge_attr_dict):
-        # 1) 映射到同一维度
-        h_dict = {ntype: F.elu(self.lin_dict[ntype](x))
-                  for ntype, x in x_dict.items()}
+        """
+        前向计算：对每种节点类型分别进行卷积更新后输出。
+
+        参数:
+            x_dict: Dict[node_type, Tensor(N_nodes, in_channels)] 类型到节点特征的映射
+            edge_index_dict: Dict[(src,tgt), Tensor(2, E)] 异构边索引
+            edge_attr_dict: Dict[(src,tgt), Tensor(E, edge_dim)] 异构边特征
+        返回:
+            feat_dict: Dict[node_type, Tensor(N_nodes, hidden_channels)] 一个字典，包含各节点类型的表示向量
+        """
+        # 1) 映射到统一维度
+        feat_dict = {ntype: F.elu(self.lin_dict[ntype](x))
+                     for ntype, x in x_dict.items()}
 
         # 2) 多层卷积 + 残差
         for conv in self.convs:
-            h_new = conv(h_dict, edge_index_dict, edge_attr_dict)
-            for ntype in h_dict:
-                h = F.elu(h_new[ntype] + h_dict[ntype])
-                h = F.dropout(h, p=self.dropout, training=self.training)
-                h_dict[ntype] = h
+            new_feat = conv(feat_dict, edge_index_dict, edge_attr_dict)
+            for ntype in feat_dict:
+                updated = F.elu(new_feat[ntype] + feat_dict[ntype])
+                updated = F.dropout(updated, p=self.dropout, training=self.training)
+                feat_dict[ntype] = updated
 
-        return h_dict
+        return feat_dict
