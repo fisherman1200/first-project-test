@@ -17,6 +17,7 @@ from utils.model_utils import ModelSaver
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
 from torch.cuda.amp import autocast, GradScaler
 from trainers.losses import FocalLoss
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
 def train_model(cfg):
@@ -125,7 +126,9 @@ def train_model(cfg):
 
     # 初始化 Logger，指定要记录的关键指标名
     logger = MetricsLogger(keys=['train_loss', 'train_root_loss', 'train_true_loss',
-                                 'val_loss', 'val_root_loss', 'val_true_loss'])  # 日后可加 'acc', 'lr' …
+                                 'val_loss', 'val_root_loss', 'val_true_loss',
+                                 'train_acc', 'train_precision', 'train_recall', 'train_f1',
+                                 'val_acc', 'val_precision', 'val_recall', 'val_f1'])  # 可扩充更多指标
 
     # utils-> model_utils: 训练结束后保存神经网络模型数据
     saver = ModelSaver(base_dir='data/processed')
@@ -176,10 +179,12 @@ def train_model(cfg):
         return loss_root + 2.0 * loss_true, loss_root, loss_true
 
     def run_epoch(loader, train=True):
+        """运行一个 Epoch，返回损失和评估指标"""
         modules = [at, shared, gate_net, head_root, head_true, cross_attn]
         for m in modules:
             m.train() if train else m.eval()
         total_loss = total_root = total_true = 0.0
+        all_preds, all_labels = [], []
         context = autocast if train else torch.no_grad
         for batch in tqdm(loader, desc='Train' if train else 'Val'):
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -192,21 +197,29 @@ def train_model(cfg):
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
+            # 收集损失与预测结果
             total_loss += loss.item()
             total_root += l_root.item()
             total_true += l_true.item()
+            preds = out_root.argmax(dim=1).detach().cpu()
+            labels = batch['is_root'][:, 0].detach().cpu()
+            all_preds.extend(preds.tolist())
+            all_labels.extend(labels.tolist())
         n = len(loader)
-        return total_loss / n, total_root / n, total_true / n
-
+        acc = accuracy_score(all_labels, all_preds)
+        precision = precision_score(all_labels, all_preds, zero_division=0)
+        recall = recall_score(all_labels, all_preds, zero_division=0)
+        f1 = f1_score(all_labels, all_preds, zero_division=0)
+        return total_loss / n, total_root / n, total_true / n, acc, precision, recall, f1
 
     # 6) 训练循环
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch")
     for epoch in epoch_bar:
         # ---- Train ----
-        train_loss, train_root, train_true = run_epoch(train_loader, train=True)
+        train_loss, train_root, train_true, train_acc, train_prec, train_rec, train_f1 = run_epoch(train_loader, train=True)
         # ---- Validation ----
-        val_loss, val_root, val_true = run_epoch(val_loader, train=False)
+        val_loss, val_root, val_true, val_acc, val_prec, val_rec, val_f1 = run_epoch(val_loader, train=False)
 
         # 在进度条尾部显示当前 epoch 的各项损失
         epoch_bar.set_postfix({
@@ -215,7 +228,11 @@ def train_model(cfg):
             "train_true": f"{train_true:.4f}",
             "val_loss": f"{val_loss:.4f}",
             "val_root": f"{val_root:.4f}",
-            "val_true": f"{val_true:.4f}"
+            "val_true": f"{val_true:.4f}",
+            "train_acc": f"{train_acc:.4f}",
+            "val_acc": f"{val_acc:.4f}",
+            "train_f1": f"{train_f1:.4f}",
+            "val_f1": f"{val_f1:.4f}"
         })
 
         #  添加到 logger
@@ -226,6 +243,14 @@ def train_model(cfg):
             'val_loss': val_loss,
             'val_root_loss': val_root,
             'val_true_loss': val_true,
+            'train_acc': train_acc,
+            'train_precision': train_prec,
+            'train_recall': train_rec,
+            'train_f1': train_f1,
+            'val_acc': val_acc,
+            'val_precision': val_prec,
+            'val_recall': val_rec,
+            'val_f1': val_f1,
         }
         logger.add(epoch, avg_metrics)
 
@@ -265,8 +290,8 @@ def train_model(cfg):
     # 测试评估
     print(f"Test dataset size: {len(test_ds)}")
     print(f"Number of test batches: {len(test_loader)}")
-    test_loss, _, _ = run_epoch(test_loader, train=False)
-    print(f"Final TEST Loss: {test_loss:.4f}")
+    test_loss, _, _, test_acc, test_prec, test_rec, test_f1 = run_epoch(test_loader, train=False)
+    print(f"Final TEST Loss: {test_loss:.4f}, Acc: {test_acc:.4f}, F1: {test_f1:.4f}")
     # 也可以计算 accuracy、precision/recall 等指标
 
     # —— 可视化 & 其他后处理 ——
