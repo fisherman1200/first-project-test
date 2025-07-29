@@ -15,6 +15,7 @@ model:
     hidden_channels: 64
     num_layers: 3
     dropout: 0.3
+    pretrained_path: data/processed/pretrained_gnn.pth
   transformer:
     emb_dim: 64
     nhead: 4

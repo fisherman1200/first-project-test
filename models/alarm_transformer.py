@@ -36,8 +36,7 @@ class AlarmTransformer(nn.Module):
         self.norm = nn.LayerNorm(emb_dim)
         self.dropout = nn.Dropout(dropout)
 
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_seq: bool = False):
         """
         前向计算
         参数:
@@ -53,8 +52,11 @@ class AlarmTransformer(nn.Module):
         # Transformer 编码
         transformed = self.transformer(embedded)  # [B, L, emb_dim]
         # 自适应平均池化到一个向量
-        transformed = transformed.permute(0, 2, 1)
-        pooled = self.pool(transformed).squeeze(-1)  # [B, emb_dim]
+        trans_perm = transformed.permute(0, 2, 1)
+        pooled = self.pool(trans_perm).squeeze(-1)  # [B, emb_dim]
         # 归一化并 dropout
         pooled = self.norm(pooled)
-        return self.dropout(pooled)
+        pooled = self.dropout(pooled)
+        if return_seq:
+            return pooled, transformed
+        return pooled

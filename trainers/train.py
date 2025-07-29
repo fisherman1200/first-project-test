@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import os
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
@@ -17,6 +18,8 @@ from torch.amp import autocast
 from torch.cuda.amp import GradScaler
 from trainers.losses import FocalLoss
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from utils.eval_plots import plot_confusion, plot_roc
+from trainers.pretrain_gnn import pretrain_gnn
 
 
 # TODO: 用混淆矩阵、ROC 曲线评估两任务的效果。
@@ -68,7 +71,31 @@ def train_model(cfg):
         num_layers=cfg.gnn.num_layers
     ).to(device)
 
-    # 预计算一次所有节点的 embedding, 特征提取器, 冻结GNN的参数  TODO:先在某个任务或自监督目标上训练好 GNN，现在GNN参数还是空白
+    if cfg.gnn.pretrained_path:
+        # 文件存在 → 直接加载
+        if os.path.exists(cfg.gnn.pretrained_path):
+            print(f"加载预训练 GNN 参数: {cfg.gnn.pretrained_path}")
+            gnn_model.load_state_dict(
+                torch.load(cfg.gnn.pretrained_path, map_location=device)
+            )
+        else:
+            # 文件不存在 → 先跑预训练
+            print("未找到预训练 GNN 参数，开始无监督预训练任务……")
+            pretrain_gnn(cfg)
+            # 预训练结束后再检查并加载
+            if os.path.exists(cfg.gnn.pretrained_path):
+                print(f"预训练完成，加载生成的 GNN 参数: {cfg.gnn.pretrained_path}")
+                gnn_model.load_state_dict(
+                    torch.load(cfg.gnn.pretrained_path, map_location=device)
+                )
+            else:
+                raise FileNotFoundError(
+                    f"预训练后仍未生成文件: {cfg.gnn.pretrained_path}"
+                )
+    else:
+        print("未配置预训练路径，跳过加载与预训练")
+
+    # 预计算一次所有节点的 embedding, 特征提取器
     with torch.no_grad():  # 不要为它建图
         h_dict = gnn_model(x_dict, edge_index_dict, edge_attr_dict)
         h_core = h_dict['core']
@@ -107,8 +134,11 @@ def train_model(cfg):
     head_root = nn.Linear(128, 2)
     head_true = nn.Linear(128, 2)
 
+    # 序列级根因定位头，输出每个时间步是否为根告警
+    token_root_head = nn.Linear(cfg.transformer.emb_dim, 2)
+
     # 全部迁移到相同的gpu/cpu
-    for m in [cross_attention, gating_net, shared, head_root, head_true]:
+    for m in [cross_attention, gating_net, shared, head_root, head_true, token_root_head]:
         m.to(device)
 
     # (5.3) 定义训练优化目标
@@ -119,7 +149,8 @@ def train_model(cfg):
         list(gating_net.parameters()) +
         list(shared.parameters()) +
         list(head_root.parameters()) +
-        list(head_true.parameters()),
+        list(head_true.parameters())+
+        list(token_root_head.parameters()),
         lr=cfg.training.lr,
         weight_decay=cfg.training.weight_decay
     )
@@ -158,54 +189,60 @@ def train_model(cfg):
         node_feat = seq_node_embs.mean(dim=1)
 
         # 6.2 Transformer 嵌入
-        # batch['text_feat'] 已经是 [batch_size, max_len, feat_dim]，直接送入
-        text_feat = alarm_transformer(batch['text_feat'])# [batch_size, emb_dim]
+        # 返回序列级特征，用于定位根因
+        pooled_text, seq_feat = alarm_transformer(batch['text_feat'], return_seq=True) # [batch_size, emb_dim]
+        token_logits = token_root_head(seq_feat)  # [batch_size, max_len, 2]
 
         # 6.3 Cross-Attention 融合
         # 构造序列：2 tokens × B samples × 64 dim (hidden_channels = emb_dim = 64)
-        seq = torch.stack([node_feat, text_feat], dim=0)# [2, B, 64]
+        seq = torch.stack([node_feat, pooled_text], dim=0)# [2, B, 64]
         attn_out, _ = cross_attention(seq, seq, seq)# [2, B, 64]
         # 取两 token 的平均作为跨模态输出
         attn_fused = attn_out.mean(dim=0)# [B, 64]
 
         # 6.4 Gating Mechanism 融合
-        concat_features = torch.cat([node_feat, text_feat], dim=-1)  # [B, 128]
+        concat_features = torch.cat([node_feat, pooled_text], dim=-1)  # [B, 128]
         gate = gating_net(concat_features)  # [B, 1] in (0,1)
-        fused = gate * attn_fused + (1 - gate) * text_feat  # [B, 64]
+        fused = gate * attn_fused + (1 - gate) * pooled_text  # [B, 64]
 
         # 6.5 Multi-Task Head
         shared_feat = shared(fused)# [B, 128]
         out_root = head_root(shared_feat)# [B, 2]
         out_true = head_true(shared_feat)# [B, 2]
-        return out_root, out_true
+        return out_root, out_true, token_logits
 
-    def compute_loss(out_root, out_true, batch):
+    def compute_loss(out_root, out_true, token_logits, batch):
         """计算损失函数"""
         root_label = batch['is_root'].max(dim=1).values  # [B]
         true_label = batch['is_true_fault'].max(dim=1).values  # [B]
-        # root 也使用 Focal Loss（或设置 class weight）
+        # root 使用 Focal Loss（或设置 class weight）
         loss_root = focal_loss_fn(out_root, root_label)
+        # 序列级根因定位损失
+        token_loss = focal_loss_fn(
+            token_logits.view(-1, 2),
+            batch['is_root'].view(-1)
+        )
         mask = root_label == 1
         if mask.any():
             # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
             loss_true = focal_loss_fn(out_true[mask], true_label[mask])
         else:
             loss_true = out_root.new_tensor(0.0)
-        return loss_root + 2.0 * loss_true, loss_root, loss_true
+        return loss_root + token_loss + 2.0 * loss_true, loss_root, loss_true, token_loss
 
     def run_epoch(loader, train=True):
         """运行一个 Epoch，返回损失和评估指标"""
-        modules = [alarm_transformer, shared, gating_net, head_root, head_true, cross_attention]
+        modules = [alarm_transformer, shared, gating_net, head_root, head_true, cross_attention, token_root_head]
         for m in modules:
             m.train() if train else m.eval()
-        total_loss = total_root = total_true = 0.0
+        total_loss = total_root = total_true = total_token = 0.0
         all_preds, all_labels = [], []
         context = autocast('cuda', enabled=True) if train else torch.no_grad()
         for batch in tqdm(loader, desc='Train' if train else 'Val',ncols=100, leave=False):
             batch = {k: v.to(device) for k, v in batch.items()}
             with context:
-                out_root, out_true = forward_batch(batch)
-                loss, l_root, l_true = compute_loss(out_root, out_true, batch)
+                out_root, out_true, token_logits = forward_batch(batch)
+                loss, l_root, l_true, l_token = compute_loss(out_root, out_true, token_logits, batch)
             if train:
                 # 6.6 反向传播
                 optimizer.zero_grad()
@@ -216,6 +253,7 @@ def train_model(cfg):
             total_loss += loss.item()
             total_root += l_root.item()
             total_true += l_true.item()
+            total_token += l_token.item()
             preds = out_root.argmax(dim=1).detach().cpu()
             labels = batch['is_root'].max(dim=1).values.detach().cpu()
             all_preds.extend(preds.tolist())
@@ -225,21 +263,22 @@ def train_model(cfg):
         precision = precision_score(all_labels, all_preds, zero_division=0)
         recall = recall_score(all_labels, all_preds, zero_division=0)
         f1 = f1_score(all_labels, all_preds, zero_division=0)
-        return total_loss / num_batches, total_root / num_batches, total_true / num_batches, acc, precision, recall, f1
+        return (total_loss / num_batches, total_root / num_batches, total_true / num_batches, acc, precision, recall, f1
+                    , total_token/num_batches)
 
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
         # ---- Train ----
-        train_loss, train_root, train_true, train_acc, train_prec, train_rec, train_f1 = run_epoch(train_loader, train=True)
+        train_loss, train_root, train_true, train_acc, train_prec, train_rec, train_f1, train_token = run_epoch(train_loader, train=True)
         # ---- Validation ----
-        val_loss, val_root, val_true, val_acc, val_prec, val_rec, val_f1 = run_epoch(val_loader, train=False)
+        val_loss, val_root, val_true, val_acc, val_prec, val_rec, val_f1, val_token = run_epoch(val_loader, train=False)
 
         # 在进度条尾部显示当前 epoch 的各项损失<在每个 epoch 末尾，拼一个想要的输出
         post_str = (
             f"Epoch {epoch}: \n"
-            f"Train_loss：loss={train_loss:.4f}, root={train_root:.4f}, true={train_true:.4f}  |  "
-            f"Val_loss：loss={val_loss:.4f}, root={val_root:.4f}, true={val_true:.4f}  |  \n"
+            f"Train_loss：loss={train_loss:.4f}, root={train_root:.4f}, true={train_true:.4f}  | token={train_token:.4f}\n "
+            f"Val_loss：loss={val_loss:.4f}, root={val_root:.4f}, true={val_true:.4f}  | token={val_token:.4f} \n"
             f"acc：train={train_acc:.4f}, val={val_acc:.4f}  |  "
             f"precision：train={train_prec:.4f}, val={val_prec:.4f}  |  "
             f"recall：train={train_rec:.4f}, val={val_rec:.4f}  |  "
@@ -273,7 +312,7 @@ def train_model(cfg):
         if val_loss < best_val:
             best_val = val_loss
             no_improve_times = 0
-            saved = saver.save_best(gnn=gnn_model, at=alarm_transformer)
+            saved = saver.save_best(gnn=gnn_model, at=alarm_transformer, token=token_root_head)
         else:
             no_improve_times += 1
             if no_improve_times >= cfg.training.early_stop_patience:
@@ -282,31 +321,46 @@ def train_model(cfg):
 
     # —— 训练 & 验证 结束后，加载最佳模型权重，再对 test_loader 评估一次 ——
     print("Loading best model weights and evaluating on TEST set…")
-    best_gnn = GNNTransformer(
-        in_channels=topo_ds.feature_dim,
-        hidden_channels=cfg.gnn.hidden_channels,
-        dropout=cfg.gnn.dropout,
-        num_layers=cfg.gnn.num_layers
-    )
-    best_gnn.load_state_dict(torch.load(saved['gnn']))
-    best_at = AlarmTransformer(
-        input_dim=full_alarm_ds[0]['text_feat'].shape[1],
-        emb_dim=cfg.transformer.emb_dim,
-        nhead=cfg.transformer.nhead,
-        hid_dim=cfg.transformer.hid_dim,
-        nlayers=cfg.transformer.nlayers,
-        max_len=cfg.transformer.max_len,
-        dropout=cfg.transformer.dropout
-    )
-    best_at.load_state_dict(torch.load(saved['at']))
-    best_gnn.eval(); best_at.eval()
+    gnn_model.load_state_dict(torch.load(saved['gnn']))
+    alarm_transformer.load_state_dict(torch.load(saved['alarm']))
+    token_root_head.load_state_dict(torch.load(saved['token_root_head']))
+    gnn_model.eval(); alarm_transformer.eval(); token_root_head.eval()
 
     # 测试评估
     print(f"Test dataset size: {len(test_ds)}")
     print(f"Number of test batches: {len(test_loader)}")
-    test_loss, _, _, test_acc, test_prec, test_rec, test_f1 = run_epoch(test_loader, train=False)
+    test_loss, _, _, test_acc, test_prec, test_rec, test_f1, _ = run_epoch(test_loader, train=False)
     print(f"Final TEST Loss: {test_loss:.4f}, Acc: {test_acc:.4f}, F1: {test_f1:.4f}")
-    # 也可以计算 accuracy、precision/recall 等指标
+
+    # --- Confusion Matrix & ROC Curve ---
+    def eval_with_probs(loader):
+        """收集预测概率与标签"""
+        root_probs_f = []
+        root_labels_f = []
+        true_probs_f = []
+        true_labels_f = []
+        with torch.no_grad():
+            for batch in loader:
+                out_root, out_true, _ = forward_batch(batch)
+                prob_root = out_root.softmax(dim=1)[:, 1].cpu()
+                label_root = batch['is_root'].max(dim=1).values.cpu()
+                prob_true = out_true.softmax(dim=1)[:, 1].cpu()
+                label_true = batch['is_true_fault'].max(dim=1).values.cpu()
+                root_probs_f.extend(prob_root.tolist())
+                root_labels_f.extend(label_root.tolist())
+                mask = label_root == 1
+                true_probs_f.extend(prob_true[mask].tolist())
+                true_labels_f.extend(label_true[mask].tolist())
+        return (root_labels_f, root_probs_f), (true_labels_f, true_probs_f)
+
+    (root_labels, root_probs), (true_labels, true_probs) = eval_with_probs(test_loader)
+    root_preds = [1 if p >= 0.5 else 0 for p in root_probs]
+    true_preds = [1 if p >= 0.5 else 0 for p in true_probs]
+    plot_confusion(root_labels, root_preds, ("Derived", "Root"), "root_confusion")
+    plot_roc(root_labels, root_probs, "root")
+    if true_labels:
+        plot_confusion(true_labels, true_preds, ("NonFault", "True"), "true_confusion")
+        plot_roc(true_labels, true_probs, "true")
 
     # —— 可视化 & 其他后处理 ——
     # utils-> plot_metrics: 生成metrics数据json

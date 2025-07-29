@@ -16,33 +16,38 @@ class AlarmDataset(Dataset):
         AlarmDataset: 从告警日志中构建时序事件序列，生成节点索引、文本特征和标签。
 
         输入参数:
-          json_path (str): 原始告警日志 JSON 路径，GBK 编码
-          node_id_map (Dict[str,int]): 拓扑节点 ID -> 索引（1 开始，0 保留为 PAD）,通常由topo_dataset得到
-          max_len (int): 每个时间窗口序列的最大长度 L
-          window_milliseconds (int): 粗聚集时间窗口大小（毫秒）
-          step_milliseconds (int): 精细滑动步长（毫秒）
-          preproc_path (str): 预处理缓存文件路径，若存在则直接加载
+             json_path (str): 原始告警日志 JSON 路径，GBK 编码
+             node_id_map (Dict[str,int]): 拓扑节点 ID -> 索引（1 开始，0 保留为 PAD）,通常由topo_dataset得到
+             max_len (int): 每个时间窗口序列的最大长度 L
+             window_milliseconds (int): 粗聚集时间窗口大小（毫秒）
+             step_milliseconds (int): 精细滑动步长（毫秒）
+             preproc_path (str): 预处理缓存文件路径，若存在则直接加载
 
         输出样本 (dict) 字段:
-          'node_idxs': LongTensor([L]) 序列内每条告警对应的节点索引
-          'text_feat': FloatTensor([L, D]) 每条告警的文本+数值+嵌入特征
-          'is_root': LongTensor([L]) 每条告警是否为根源 (0/1)
-          'is_true_fault': LongTensor([L]) 每条根源告警是否为真实故障 (0/1)
+            'node_idxs': LongTensor([L]) 序列内每条告警对应的节点索引
+            'device_idxs': LongTensor([L]) 每条告警对应的设备索引
+            'text_feat': FloatTensor([L, D]) 每条告警的文本+数值+嵌入特征
+            'is_root': LongTensor([L]) 每条告警是否为根源 (0/1)
+            'is_true_fault': LongTensor([L]) 每条根源告警是否为真实故障 (0/1)
 
         使用方法示例:
-          ds = AlarmDataset("data/alarms.json", node_id_map, max_len=16,
-                            window_milliseconds=5000, step_milliseconds=500)
-          sample = ds[0]
-          node_idxs, text_feat, is_root, is_true = (
-              sample['node_idxs'], sample['text_feat'],
-              sample['is_root'], sample['is_true_fault'])
+             ds = AlarmDataset("data/alarms.json", node_id_map, max_len=16, window_milliseconds=5000, step_milliseconds=500)
+             sample = ds[0]
+             node_idxs, text_feat, is_root, is_true = (
+                        sample['node_idxs'], sample['text_feat'],
+                        sample['is_root'], sample['is_true_fault'])
     """
     def __init__(self, json_path, node_id_map, max_len=16,
                  window_milliseconds=5000, step_milliseconds=500,
-                 preproc_path='data/processed/processed_alarm_sequences.pt'):
+                 preproc_path='data/processed/processed_alarm_sequences_v1.pt'):
         if os.path.exists(preproc_path):
-            # 直接加载预处理好的 sequences 列表
-            self.samples = torch.load(preproc_path)
+            # 直接加载预处理好的序列和映射信息
+            cached = torch.load(preproc_path)
+            self.samples = cached['samples']
+            self.idx_to_node = cached.get('idx_to_node', [])
+            self.idx_to_device = cached.get('idx_to_device', [])
+            self.le_node = LabelEncoder().fit(self.idx_to_node)
+            self.le_dev = LabelEncoder().fit(self.idx_to_device)
             print(f"在 {preproc_path} 发现预处理过的文件，读取 {len(self.samples)} 条数据")
         else:
             print(f"没有在 {preproc_path} 找到预处理过的数据，开始预处理数据")
@@ -113,6 +118,8 @@ class AlarmDataset(Dataset):
             all_device_ids = sorted({a['device_id'] for a in raw_data})
             self.le_node = LabelEncoder().fit(all_node_names)
             self.le_dev = LabelEncoder().fit(all_device_ids)
+            self.idx_to_node = self.le_node.classes_.tolist()
+            self.idx_to_device = self.le_dev.classes_.tolist()
             # 定义 embedding 层
             self.node_emb = nn.Embedding(len(self.le_node.classes_), 32)
             self.dev_emb = nn.Embedding(len(self.le_dev.classes_), 32)
@@ -123,8 +130,10 @@ class AlarmDataset(Dataset):
             # ---------------------------更改：从one-hot到RoBERTa---------------------------
             # 构建样本列表
             self.samples = []
+            # 保存设备索引，便于后续故障定位
             for seq in sequences:
-                node_idxs, features, root_labels, true_labels = [], [], [], []
+                node_idxs, device_idxs = [], []
+                features, root_labels, true_labels = [], [], []
                 for a in seq:
                     # —— 1) 先做一下清洗 ——
                     raw_name = a.get('node_name', '')
@@ -175,6 +184,7 @@ class AlarmDataset(Dataset):
                     didx = self.le_dev.transform([a['device_id']])[0]
                     node_v = self.node_emb(torch.tensor(nidx, device=text_emb.device))
                     dev_v = self.dev_emb(torch.tensor(didx, device=text_emb.device))
+                    device_idxs.append(didx)
 
                     # ——  concat 所有特征 ——
                     # [768] ∥ [1] ∥ [1] ∥ [32] ∥ [32] → [834]
@@ -207,11 +217,13 @@ class AlarmDataset(Dataset):
                 if seq_len < max_len:
                     features.extend([pad_feat] * pad_count)
                     node_idxs.extend([0] * pad_count)
+                    device_idxs.extend([0] * pad_count)
                     root_labels.extend([0] * pad_count)
                     true_labels.extend([0] * pad_count)
                 elif seq_len > max_len:
                     features = features[:max_len]
                     node_idxs = node_idxs[:max_len]
+                    device_idxs = device_idxs[:max_len]
                     root_labels = root_labels[:max_len]
                     true_labels = true_labels[:max_len]
 
@@ -221,17 +233,24 @@ class AlarmDataset(Dataset):
 
                 node_idxs_arr = np.array(node_idxs, dtype=np.int64)  # [L]
                 node_idxs_tensor = torch.from_numpy(node_idxs_arr)
+                device_idxs_arr = np.array(device_idxs, dtype=np.int64)
+                device_idxs_tensor = torch.from_numpy(device_idxs_arr)
 
                 # 转成 tensor 并保存
                 self.samples.append({
                     'node_idxs': node_idxs_tensor,
+                    'device_idxs': device_idxs_tensor,
                     'text_feat': text_feat_tensor,
                     'is_root': torch.tensor(root_labels, dtype=torch.long),
                     'is_true_fault': torch.tensor(true_labels, dtype=torch.long)
                 })
 
-            # # 缓存到磁盘，下次直接加载：
-            torch.save(self.samples, preproc_path)
+            # 缓存到磁盘，下次直接加载：同时保存映射信息
+            torch.save({
+                'samples': self.samples,
+                'idx_to_node': self.le_node.classes_.tolist(),
+                'idx_to_device': self.le_dev.classes_.tolist()
+            }, preproc_path)
             print(f"预处理完成，保存了 {len(self.samples)} 条数据在 {preproc_path}")
 
 
@@ -242,10 +261,11 @@ class AlarmDataset(Dataset):
     def __getitem__(self, idx):
         """
                按索引返回单条样本:
-                   node_idxs: LongTensor([L])
-                   text_feat: FloatTensor([L, D])
-                   is_root: LongTensor([L])
-                   is_true_fault: LongTensor([L])
+                    node_idxs: LongTensor([L])
+                    device_idxs: LongTensor([L])
+                    text_feat: FloatTensor([L, D])
+                    is_root: LongTensor([L])
+                    is_true_fault: LongTensor([L])
                """
         return self.samples[idx]
 

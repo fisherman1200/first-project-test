@@ -22,6 +22,7 @@ class GNNConfig:
     hidden_channels: int
     num_layers: int
     dropout: float
+    pretrained_path: str
 
 
 @dataclass
