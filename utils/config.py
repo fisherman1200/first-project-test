@@ -42,8 +42,10 @@ class TrainingConfig:
     weight_decay: float
     lr_step_size: int
     early_stop_patience: int
-    focal_alpha : float
-    focal_gamma : float
+    root_focal_alpha : float
+    root_focal_gamma : float
+    true_focal_alpha : float
+    true_focal_gamma : float
     true_loss_weight : float
 
 
@@ -68,8 +70,10 @@ def load_config(path: str = "configs/config.yaml") -> Config:
             weight_decay=float(cfg['training']['weight_decay']),
             lr_step_size=int(cfg['training']['lr_step_size']),
             early_stop_patience=int(cfg['training']['early_stop_patience']),
-            focal_alpha=float(cfg['training']['focal_alpha']),
-            focal_gamma=float(cfg['training']['focal_gamma']),
+            root_focal_alpha=float(cfg['training']['root_focal_alpha']),
+            root_focal_gamma=float(cfg['training']['root_focal_gamma']),
+            true_focal_alpha=float(cfg['training']['true_focal_alpha']),
+            true_focal_gamma=float(cfg['training']['true_focal_gamma']),
             true_loss_weight=float(cfg['training']['true_loss_weight']),
         ),
     )

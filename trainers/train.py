@@ -24,10 +24,6 @@ from utils.eval_plots import plot_confusion, plot_roc
 from trainers.pretrain_gnn import pretrain_gnn
 
 
-# TODO: 用混淆矩阵、ROC 曲线评估两任务的效果。
-# TODO: 定位，可解释性神经网络。
-
-
 def train_model(cfg):
     # 打印统一的运行时间戳，便于管理输出目录
     run_ts = get_run_timestamp()
@@ -54,16 +50,27 @@ def train_model(cfg):
                                              [cfg.data.num_train, cfg.data.num_val, cfg.data.num_test],
                                              generator=torch.Generator().manual_seed(42))
 
-    # ----- 使用WeightedRandomSampler加权采样解决正负样本不均衡 -----
-    # 统计训练集每条序列是否含根告警
-    train_labels = [full_alarm_ds[i]['is_root'].max().item() for i in train_ds.indices]
-    # 计算每个类别的权重：数量越少权重越大
-    class_count = np.bincount(train_labels)
-    class_weights = 1.0 / class_count
-    # 为每个样本分配相应权重
-    sample_weights = [class_weights[label] for label in train_labels]
+    # ----- 使用 WeightedRandomSampler 解决样本不均衡 -----
+    # 统计训练集每条序列在 (is_root, is_true_fault) 维度上的组合
+    train_combo = []
+    for idx in train_ds.indices:
+        sample = full_alarm_ds[idx]
+        has_root = sample['is_root'].max().item()
+        has_true = sample['is_true_fault'].max().item()
+        # 0=无根告警，1=根告警但非真实故障，2=真实故障
+        if has_root:
+            combo = 2 if has_true else 1
+        else:
+            combo = 0
+        train_combo.append(combo)
+
+    # 计算每个组合类别的权重，数量越少权重越大
+    class_count = np.bincount(train_combo, minlength=3)
+    class_weights = 1.0 / (class_count + 1e-6)  # 避免除零
+    sample_weights = [class_weights[c] for c in train_combo]
     sampler = WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
-    # 针对训练集中is_root=1的样本过采样
+
+    # 使用 sampler 对训练集中稀缺类别进行过采样
     train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size, sampler=sampler)
     val_loader = DataLoader(val_ds, batch_size=cfg.data.batch_size, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size, shuffle=False)
@@ -173,16 +180,23 @@ def train_model(cfg):
     scaler = GradScaler()
 
     # (5.5)初始化 Logger，指定要记录的关键指标名
-    logger = MetricsLogger(keys=['train_loss', 'train_root_loss', 'train_true_loss',
-                                 'val_loss', 'val_root_loss', 'val_true_loss',
-                                 'train_acc', 'train_precision', 'train_recall', 'train_f1',
-                                 'val_acc', 'val_precision', 'val_recall', 'val_f1'])  # 可扩充更多指标
+    logger = MetricsLogger(keys=[
+        'train_loss', 'train_root_loss', 'train_true_loss',
+        'val_loss', 'val_root_loss', 'val_true_loss',
+        # 根告警分类指标
+        'train_acc', 'train_precision', 'train_recall', 'train_f1',
+        'val_acc', 'val_precision', 'val_recall', 'val_f1',
+        # 真故障分类指标
+        'train_true_acc', 'train_true_precision', 'train_true_recall', 'train_true_f1',
+        'val_true_acc', 'val_true_precision', 'val_true_recall', 'val_true_f1'
+    ])  # 可扩充更多指标
 
     # (5.6)初始化保存模型参数的方法
     saver = ModelSaver(base_dir='data/processed/model')
 
     # (5.7)实例化Focal Losses， 减少样本不平衡的影响
-    focal_loss_fn = FocalLoss(alpha=cfg.training.focal_alpha, gamma=cfg.training.focal_gamma)
+    focal_loss_root = FocalLoss(alpha=cfg.training.root_focal_alpha, gamma=cfg.training.root_focal_gamma)
+    focal_loss_true = FocalLoss(alpha=cfg.training.true_focal_alpha, gamma=cfg.training.true_focal_gamma)
 
     # (6) 训练循环
     # --------- Helper Functions ---------
@@ -221,16 +235,16 @@ def train_model(cfg):
         root_label = batch['is_root'].max(dim=1).values  # [B]
         true_label = batch['is_true_fault'].max(dim=1).values  # [B]
         # root 使用 Focal Loss（或设置 class weight）
-        loss_root = focal_loss_fn(out_root, root_label)
+        loss_root = focal_loss_root(out_root, root_label)
         # 序列级根因定位损失
-        token_loss = focal_loss_fn(
+        token_loss = focal_loss_root(
             token_logits.view(-1, 2),
             batch['is_root'].view(-1)
         )
         mask = root_label == 1
         if mask.any():
             # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
-            loss_true = focal_loss_fn(out_true[mask], true_label[mask])
+            loss_true = focal_loss_true(out_true[mask], true_label[mask])
         else:
             loss_true = out_root.new_tensor(0.0)
         weighted_true = cfg.training.true_loss_weight * loss_true
@@ -242,7 +256,8 @@ def train_model(cfg):
         for m in modules:
             m.train() if train else m.eval()
         total_loss = total_root = total_true = total_token = 0.0
-        all_preds, all_labels = [], []
+        all_preds, all_labels = [], []       # 根告警指标
+        true_preds, true_labels = [], []     # 真故障指标
         context = autocast('cuda', enabled=True) if train else torch.no_grad()
         for batch in tqdm(loader, desc='Train' if train else 'Val',ncols=100, leave=False):
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -264,32 +279,63 @@ def train_model(cfg):
             labels = batch['is_root'].max(dim=1).values.detach().cpu()
             all_preds.extend(preds.tolist())
             all_labels.extend(labels.tolist())
+            # 仅在存在根告警的样本上评估真故障分类
+            mask = labels == 1
+            if mask.any():
+                t_pred = out_true.argmax(dim=1).detach().cpu()[mask]
+                t_label = batch['is_true_fault'].max(dim=1).values.detach().cpu()[mask]
+                true_preds.extend(t_pred.tolist())
+                true_labels.extend(t_label.tolist())
         num_batches = len(loader)
         acc = accuracy_score(all_labels, all_preds)
         precision = precision_score(all_labels, all_preds, zero_division=0)
         recall = recall_score(all_labels, all_preds, zero_division=0)
         f1 = f1_score(all_labels, all_preds, zero_division=0)
-        return (total_loss / num_batches, total_root / num_batches, total_true / num_batches, acc, precision, recall, f1
-                    , total_token/num_batches)
+
+        if true_labels:
+            acc_t = accuracy_score(true_labels, true_preds)
+            prec_t = precision_score(true_labels, true_preds, zero_division=0)
+            rec_t = recall_score(true_labels, true_preds, zero_division=0)
+            f1_t = f1_score(true_labels, true_preds, zero_division=0)
+        else:
+            acc_t = prec_t = rec_t = f1_t = 0.0
+
+        return (
+            total_loss / num_batches, total_root / num_batches, total_true / num_batches,
+            acc, precision, recall, f1,
+            acc_t, prec_t, rec_t, f1_t,
+            total_token / num_batches
+        )
 
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
     train_start = time.time()  # 记录训练开始时间
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
         # ---- Train ----
-        train_loss, train_root, train_true, train_acc, train_prec, train_rec, train_f1, train_token = run_epoch(train_loader, train=True)
+        (train_loss, train_root, train_true,
+         train_acc, train_prec, train_rec, train_f1,
+         train_true_acc, train_true_prec, train_true_rec, train_true_f1,
+         train_token) = run_epoch(train_loader, train=True)
         # ---- Validation ----
-        val_loss, val_root, val_true, val_acc, val_prec, val_rec, val_f1, val_token = run_epoch(val_loader, train=False)
+        (val_loss, val_root, val_true,
+         val_acc, val_prec, val_rec, val_f1,
+         val_true_acc, val_true_prec, val_true_rec, val_true_f1,
+         val_token) = run_epoch(val_loader, train=False)
 
         # 在进度条尾部显示当前 epoch 的各项损失<在每个 epoch 末尾，拼一个想要的输出
         post_str = (
             f"Epoch {epoch}: \n"
-            f"Train_loss：loss={train_loss:.4f}, root={train_root:.4f}, true={train_true:.4f}  | token={train_token:.4f}\n "
-            f"Val_loss：loss={val_loss:.4f}, root={val_root:.4f}, true={val_true:.4f}  | token={val_token:.4f} \n"
-            f"acc：train={train_acc:.4f}, val={val_acc:.4f}  |  "
-            f"precision：train={train_prec:.4f}, val={val_prec:.4f}  |  "
-            f"recall：train={train_rec:.4f}, val={val_rec:.4f}  |  "
-            f"F1：train={train_f1:.4f}, val={val_f1:.4f}"
+            f"Total_loss：train={train_loss:.4f}, val={val_loss:.4f}  |  "
+            f"Root_loss：train={train_loss:.4f}, val={val_loss:.4f}  |  "
+            f"True_loss：train={train_root:.4f}, val={val_root:.4f}\n  "
+            f"Root-acc：train={train_true:.4f}, val={val_true:.4f}  |  "
+            f"Root-precision：train={train_prec:.4f}, val={val_prec:.4f}  |  "
+            f"Root-recall：train={train_rec:.4f}, val={val_rec:.4f}  |  "
+            f"Root-F1：train={train_f1:.4f}, val={val_f1:.4f}\n"
+            f"True-acc：train={train_true_acc:.4f}, val={val_true_acc:.4f}  |  "
+            f"True-precision：train={train_true_prec:.4f}, val={val_true_prec:.4f}  |  "
+            f"True-recall：train={train_true_rec:.4f}, val={val_true_rec:.4f}  |  "
+            f"True-F1：train={train_true_f1:.4f}, val={val_true_f1:.4f}"
         )
         tqdm.write(post_str)  # → 直接输出完整一行，不会被截断
         # 然后单独用 set_postfix_str：
@@ -311,6 +357,14 @@ def train_model(cfg):
             'val_precision': val_prec,
             'val_recall': val_rec,
             'val_f1': val_f1,
+            'train_true_acc': train_true_acc,
+            'train_true_precision': train_true_prec,
+            'train_true_recall': train_true_rec,
+            'train_true_f1': train_true_f1,
+            'val_true_acc': val_true_acc,
+            'val_true_precision': val_true_prec,
+            'val_true_recall': val_true_rec,
+            'val_true_f1': val_true_f1,
         }
         logger.add(epoch, avg_metrics)
 
@@ -339,9 +393,16 @@ def train_model(cfg):
     # 测试评估
     print(f"Test dataset size: {len(test_ds)}")
     print(f"Number of test batches: {len(test_loader)}")
-    test_loss, _, _, test_acc, test_prec, test_rec, test_f1, _ = run_epoch(test_loader, train=False)
-    print(f"Final TEST Loss: {test_loss:.4f}, Acc: {test_acc:.4f}, F1: {test_f1:.4f}")
-
+    (
+        test_loss, _, _,
+        test_acc, test_prec, test_rec, test_f1,
+        test_true_acc, test_true_prec, test_true_rec, test_true_f1,
+        _
+    ) = run_epoch(test_loader, train=False)
+    print(
+        f"Final TEST Loss: {test_loss:.4f}, Acc: {test_acc:.4f}, F1: {test_f1:.4f} | "
+        f"TrueAcc: {test_true_acc:.4f}, TrueF1: {test_true_f1:.4f}"
+    )
     # --- Confusion Matrix & ROC Curve ---
     def eval_with_probs(loader):
         """收集预测概率与标签"""

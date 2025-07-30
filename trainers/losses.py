@@ -5,7 +5,7 @@ from torch import nn
 class FocalLoss(nn.Module):
     """Focal Loss 用于处理类别不平衡的问题"""
     # Focal Loss=−α(1−pt)^gamma * log(pt)
-    def __init__(self, alpha: float = 1.0, gamma: float = 2.0, reduction: str = 'mean'):
+    def __init__(self, alpha: float = 0.5, gamma: float = 2.0, reduction: str = 'mean'):
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma

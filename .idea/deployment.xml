@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="root@connect.bjb1.seetacloud.com:23720 password" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="root@connect.bjb1.seetacloud.com:20160 password" remoteFilesAllowedToDisappearOnAutoupload="false" showExcludedInSync="true">
     <serverData>
+      <paths name="root@connect.bjb1.seetacloud.com:20160 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/autodl-tmp/test1" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="root@connect.bjb1.seetacloud.com:23720 password">
         <serverdata>
           <mappings>
