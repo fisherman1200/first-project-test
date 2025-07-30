@@ -3,8 +3,11 @@
 """
 
 import os
+
+import numpy as np
+
 from utils.path_utils import get_output_dir
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, Any
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, roc_curve, auc
@@ -53,8 +56,12 @@ def plot_confusion(labels: Sequence[int], preds: Sequence[int],
     return out_path
 
 
-def plot_roc(labels: Sequence[int], probs: Sequence[float], prefix: str) -> str:
-    fpr, tpr, _ = roc_curve(labels, probs)
+def plot_roc(labels: Sequence[int], probs: Sequence[float], prefix: str) -> tuple[str, Any]:
+    fpr, tpr, thresholds = roc_curve(labels, probs)
+    youden = tpr - fpr
+    best_idx = np.argmax(youden)
+    best_threshold = thresholds[best_idx]
+    print("最佳阈值（Youden）:", best_threshold)
     roc_auc = auc(fpr, tpr)
     fig, ax = plt.subplots()
     ax.plot(fpr, tpr, label=rf"AUC={roc_auc:.3f}")
@@ -69,7 +76,7 @@ def plot_roc(labels: Sequence[int], probs: Sequence[float], prefix: str) -> str:
     plt.savefig(out_path)
     plt.close(fig)
     print(f"Saved ROC curve to {out_path}")
-    return out_path
+    return out_path, best_threshold
 
 
 __all__ = ["plot_confusion", "plot_roc"]

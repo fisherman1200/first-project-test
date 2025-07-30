@@ -429,12 +429,13 @@ def train_model(cfg):
 
     (root_labels, root_probs), (true_labels, true_probs) = eval_with_probs(train_loader)
     root_preds = [1 if p >= 0.5 else 0 for p in root_probs]
-    true_preds = [1 if p >= 0.5 else 0 for p in true_probs]
     plot_confusion(root_labels, root_preds, ("Derived", "Root"), "root_confusion")
     plot_roc(root_labels, root_probs, "root")
     if true_labels:
-        plot_confusion(true_labels, true_preds, ("NonFault", "True"), "true_confusion")
-        plot_roc(true_labels, true_probs, "true")
+        _, best_threshold = plot_roc(true_labels, true_probs, "true")
+        true_preds_opt = [1 if p >= best_threshold else 0 for p in true_probs]
+        plot_confusion(true_labels, true_preds_opt, ("NonFault", "True"), "true_confusion")
+
 
     # —— 可视化 & 其他后处理 ——
     # utils-> plot_metrics: 生成metrics数据json
