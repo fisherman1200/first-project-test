@@ -33,5 +33,5 @@ training:
   root_focal_alpha: 0.3
   root_focal_gamma: 2.0
   true_focal_alpha: 0.55
-  true_focal_gamma: 3.0
-  true_loss_weight: 3.0
+  true_focal_gamma: 3.5
+  true_loss_weight: 4.0

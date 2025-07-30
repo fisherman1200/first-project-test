@@ -241,12 +241,14 @@ def train_model(cfg):
             token_logits.view(-1, 2),
             batch['is_root'].view(-1)
         )
-        mask = root_label == 1
-        if mask.any():
-            # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
-            loss_true = focal_loss_true(out_true[mask], true_label[mask])
-        else:
-            loss_true = out_root.new_tensor(0.0)
+        # mask = root_label == 1
+        # if mask.any():
+        #     # 对 True-RCA 使用 Focal Loss，提升少数类的关注度
+        #     loss_true = focal_loss_true(out_true[mask], true_label[mask])
+        # else:
+        #     loss_true = out_root.new_tensor(0.0)
+        # # 不再区分根告警是否存在，直接计算 True-RCA 的 Focal Loss
+        loss_true = focal_loss_true(out_true, true_label)
         weighted_true = cfg.training.true_loss_weight * loss_true
         return loss_root + token_loss + weighted_true, loss_root, loss_true, token_loss
 
@@ -326,9 +328,9 @@ def train_model(cfg):
         post_str = (
             f"Epoch {epoch}: \n"
             f"Total_loss：train={train_loss:.4f}, val={val_loss:.4f}  |  "
-            f"Root_loss：train={train_loss:.4f}, val={val_loss:.4f}  |  "
-            f"True_loss：train={train_root:.4f}, val={val_root:.4f}\n  "
-            f"Root-acc：train={train_true:.4f}, val={val_true:.4f}  |  "
+            f"Root_loss：train={train_root:.4f}, val={val_root:.4f}  |  "
+            f"True_loss：train={train_true:.4f}, val={val_true:.4f}\n"
+            f"Root-acc：train={train_acc:.4f}, val={val_acc:.4f}  |  "
             f"Root-precision：train={train_prec:.4f}, val={val_prec:.4f}  |  "
             f"Root-recall：train={train_rec:.4f}, val={val_rec:.4f}  |  "
             f"Root-F1：train={train_f1:.4f}, val={val_f1:.4f}\n"
