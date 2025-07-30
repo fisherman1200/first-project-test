@@ -38,7 +38,9 @@ class TransformerConfig:
 @dataclass
 class TrainingConfig:
     epochs: int
+    stage1_epochs : int
     lr: float
+    lr_true : float
     weight_decay: float
     lr_step_size: int
     early_stop_patience: int
@@ -66,7 +68,9 @@ def load_config(path: str = "configs/config.yaml") -> Config:
         transformer=TransformerConfig(**cfg['model']['transformer']),
         training=TrainingConfig(
             epochs=int(cfg['training']['epochs']),
+            stage1_epochs=int(cfg['training']['stage1_epochs']),
             lr=float(cfg['training']['lr']),
+            lr_true=float(cfg['training']['lr_true']),
             weight_decay=float(cfg['training']['weight_decay']),
             lr_step_size=int(cfg['training']['lr_step_size']),
             early_stop_patience=int(cfg['training']['early_stop_patience']),

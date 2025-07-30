@@ -26,12 +26,14 @@ model:
 
 training:
   epochs: 20
+  stage1_epochs: 8
   lr: 1e-3
+  lr_true: 5e-4
   weight_decay: 1e-5
   lr_step_size: 10
-  early_stop_patience : 5
-  root_focal_alpha: 0.3
+  early_stop_patience : 7
+  root_focal_alpha: 0.4
   root_focal_gamma: 2.0
-  true_focal_alpha: 0.55
-  true_focal_gamma: 3.5
-  true_loss_weight: 4.0
+  true_focal_alpha: 0.65
+  true_focal_gamma: 4.0
+  true_loss_weight: 4.3
