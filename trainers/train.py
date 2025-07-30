@@ -13,6 +13,7 @@ from tqdm import tqdm
 from utils.metrics_utils import MetricsLogger
 from utils.visualize_embeddings import extract_embeddings, plot_tsne
 from utils.model_utils import ModelSaver
+from utils.path_utils import get_run_timestamp
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
 from torch.amp import autocast
 from torch.cuda.amp import GradScaler
@@ -27,6 +28,9 @@ from trainers.pretrain_gnn import pretrain_gnn
 
 
 def train_model(cfg):
+    # 打印统一的运行时间戳，便于管理输出目录
+    run_ts = get_run_timestamp()
+    print("本次运行时间戳:", run_ts)
     # 启动gpu/cpu
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("目前训练使用的Device:", device)
@@ -174,7 +178,7 @@ def train_model(cfg):
                                  'val_acc', 'val_precision', 'val_recall', 'val_f1'])  # 可扩充更多指标
 
     # (5.6)初始化保存模型参数的方法
-    saver = ModelSaver(base_dir='data/processed')
+    saver = ModelSaver(base_dir='data/processed/model')
 
     # (5.7)实例化Focal Losses， 减少样本不平衡的影响
     focal_loss_fn = FocalLoss(alpha=cfg.training.focal_alpha, gamma=cfg.training.focal_gamma)
@@ -312,7 +316,7 @@ def train_model(cfg):
         if val_loss < best_val:
             best_val = val_loss
             no_improve_times = 0
-            saved = saver.save_best(gnn=gnn_model, at=alarm_transformer, token=token_root_head)
+            saved = saver.save_best(gnn_model=gnn_model, alarm_transformer=alarm_transformer, token_root_head=token_root_head)
         else:
             no_improve_times += 1
             if no_improve_times >= cfg.training.early_stop_patience:
@@ -321,8 +325,8 @@ def train_model(cfg):
 
     # —— 训练 & 验证 结束后，加载最佳模型权重，再对 test_loader 评估一次 ——
     print("Loading best model weights and evaluating on TEST set…")
-    gnn_model.load_state_dict(torch.load(saved['gnn']))
-    alarm_transformer.load_state_dict(torch.load(saved['alarm']))
+    gnn_model.load_state_dict(torch.load(saved['gnn_model']))
+    alarm_transformer.load_state_dict(torch.load(saved['alarm_transformer']))
     token_root_head.load_state_dict(torch.load(saved['token_root_head']))
     gnn_model.eval(); alarm_transformer.eval(); token_root_head.eval()
 
@@ -341,6 +345,7 @@ def train_model(cfg):
         true_labels_f = []
         with torch.no_grad():
             for batch in loader:
+                batch = {k: v.to(device) for k, v in batch.items()}
                 out_root, out_true, _ = forward_batch(batch)
                 prob_root = out_root.softmax(dim=1)[:, 1].cpu()
                 label_root = batch['is_root'].max(dim=1).values.cpu()
@@ -353,7 +358,7 @@ def train_model(cfg):
                 true_labels_f.extend(label_true[mask].tolist())
         return (root_labels_f, root_probs_f), (true_labels_f, true_probs_f)
 
-    (root_labels, root_probs), (true_labels, true_probs) = eval_with_probs(test_loader)
+    (root_labels, root_probs), (true_labels, true_probs) = eval_with_probs(train_loader)
     root_preds = [1 if p >= 0.5 else 0 for p in root_probs]
     true_preds = [1 if p >= 0.5 else 0 for p in true_probs]
     plot_confusion(root_labels, root_preds, ("Derived", "Root"), "root_confusion")

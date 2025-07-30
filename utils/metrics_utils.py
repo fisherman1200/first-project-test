@@ -1,7 +1,8 @@
 import json
 import os
 from typing import List, Dict, Any
-from datetime import datetime
+from utils.path_utils import get_output_dir, get_run_timestamp
+
 
 class MetricsLogger:
     """
@@ -35,13 +36,12 @@ class MetricsLogger:
         """
         将收集到的指标保存为 JSON 文件，包含 epochs 列表和每个 key 对应的值。
         """
-        # 生成默认输出目录和文件名
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        default_dir = os.path.join('data', 'raw')
-        filename = f'metrics_data_{timestamp}.json'
+        # 生成默认输出目录和文件名，目录带有统一的运行时间戳
+        default_dir = get_output_dir('data', 'raw', 'metrics_data')
+        filename = f'metrics_data.json'
         output_path = os.path.join(default_dir, filename)
 
-        os.makedirs(os.path.dirname(default_dir), exist_ok=True)
+        os.makedirs(default_dir, exist_ok=True)
         out = {k: self.data[k] for k in self.keys}
         out['epoch'] = self.epochs
         with open(output_path, 'w', encoding='utf-8') as f:

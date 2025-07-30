@@ -3,7 +3,7 @@
 """
 
 import os
-from datetime import datetime
+from utils.path_utils import get_output_dir
 from typing import Sequence, Tuple
 
 import matplotlib.pyplot as plt
@@ -26,10 +26,10 @@ plt.rcParams.update({
 
 
 def _make_output_path(prefix: str, suffix: str) -> str:
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    directory = os.path.join("data", "processed", "eval")
+    directory = get_output_dir("data", "processed", "eval")
+    filename = f"{prefix}.{suffix}"
     os.makedirs(directory, exist_ok=True)
-    return os.path.join(directory, f"{prefix}_{ts}.{suffix}")
+    return os.path.join(directory, filename)
 
 
 def plot_confusion(labels: Sequence[int], preds: Sequence[int],

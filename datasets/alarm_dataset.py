@@ -103,8 +103,11 @@ class AlarmDataset(Dataset):
             '''
             # ---------------------------更改：从one-hot到RoBERTa---------------------------
             # ——— 加载预训练语言模型 ———
-            self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-            self.text_encoder = RobertaModel.from_pretrained('roberta-base')
+            os.environ["TRANSFORMERS_OFFLINE"] = "1" # 云服务无法联网，加载离线文件
+            self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base',
+                                                              local_files_only=True, trust_remote_code=False)
+            self.text_encoder = RobertaModel.from_pretrained('roberta-base',
+                                                             local_files_only=True, trust_remote_code=False)
             self.text_encoder.eval()
             # 文本特征维度（roberta-base hidden size = 768）
             self.feat_dim = self.text_encoder.config.hidden_size
@@ -298,11 +301,11 @@ if __name__ == '__main__':
 
     print(f"已导出 {len(out)} 条告警序列到 data/processed_alarm_sequences.json")
 
-    # 统计 is_root 第一位为 1 的序列数
-    count_root = sum(1 for seq in out if seq['is_root'][0] == 1)
+    # 统计是否存在根源告警
+    count_root = sum(1 for seq in out if max(seq['is_root']) == 1)
 
-    # 统计 is_true_fault 第一位为 1 的序列数
-    count_true = sum(1 for seq in out if seq['is_true_fault'][0] == 1)
+    # 统计是否存在真实故障
+    count_true = sum(1 for seq in out if max(seq['is_true_fault']) == 1)
 
     print(f"根源告警共有：{count_root} 条，衍生告警共有：{len(out)-count_root}条")
     print(f"真实故障共有：{count_true} 条，非真实故障有:{count_root-count_true}条")

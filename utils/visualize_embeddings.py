@@ -27,7 +27,7 @@ from datasets.topo_dataset import TopologyDataset
 from datasets.alarm_dataset import AlarmDataset
 from models.gnn_transformer import GNNTransformer
 from models.alarm_transformer import AlarmTransformer
-from datetime import datetime
+from utils.path_utils import get_output_dir
 
 # Matplotlib 全局配置，使用 LaTeX 字体，统一论文级规范
 plt.rcParams.update({
@@ -75,8 +75,8 @@ def extract_embeddings(cfg, gnn, at, topo_ds, alarm_ds):
         emb_tensor = torch.cat([pool_node, txt_emb], dim=1).squeeze(0)
         emb = emb_tensor.detach().cpu().numpy()
         embs.append(emb)
-        is_root.append(int(sample['is_root'][0].item()))
-        is_true.append(int(sample['is_true_fault'][0].item()))
+        is_root.append(int(sample['is_root'].max().item()))
+        is_true.append(int(sample['is_true_fault'].max().item()))
     return np.stack(embs), np.array(is_root), np.array(is_true)
 
 
@@ -107,12 +107,11 @@ def plot_tsne(embs: np.ndarray, labels: np.ndarray, title: str, file_name: str, 
     plt.legend(frameon=False, loc='upper right')
     plt.grid(linestyle='--', alpha=0.3)
     plt.tight_layout()
-    # 生成默认输出目录和文件名
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    default_dir = os.path.join('data', 'processed', 'clustering')
-    filename = f'{file_name}_{timestamp}.pdf'
+    # 生成带统一时间戳的输出目录
+    default_dir = get_output_dir('data', 'processed', 'clustering')
+    filename = f'{file_name}.pdf'
     output_path = os.path.join(default_dir, filename)
-    os.makedirs(os.path.dirname(default_dir), exist_ok=True)
+    os.makedirs(default_dir, exist_ok=True)
     plt.savefig(output_path)
     plt.close()
     print(f"Saved t-SNE plot '{title}' to {output_path}")
@@ -149,12 +148,16 @@ def main():
     at.load_state_dict(torch.load(args.ckpt_at))
     gnn.cpu(); at.cpu()
 
-    embs, true_labels, root_labels = extract_embeddings(cfg, gnn, at, topo_ds, alarm_ds)
+    embs, root_labels, true_labels = extract_embeddings(cfg, gnn, at, topo_ds, alarm_ds)
 
-    plot_tsne(embs, true_labels, "t-SNE：真实故障(True Fault)",
-              os.path.join(args.output_dir, "tsne_true.pdf"))
-    plot_tsne(embs, root_labels, "t-SNE：根源告警(Root Cause)",
-              os.path.join(args.output_dir, "tsne_root.pdf"))
+    plot_tsne(embs, root_labels, 't-SNE: Root vs Derived',
+              os.path.join(args.output_dir, 'tsne_root.pdf'),
+              names=('Derived', 'Root'))
+    mask_root = root_labels == 1
+    plot_tsne(embs[mask_root], true_labels[mask_root],
+              't-SNE: True Fault among Root',
+              os.path.join(args.output_dir, 'tsne_true.pdf'),
+              names=('Non-Fault', 'True Fault'))
 
 if __name__ == '__main__':
     main()

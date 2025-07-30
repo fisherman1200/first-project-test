@@ -1,6 +1,6 @@
 import os
 import torch
-from datetime import datetime
+from utils.path_utils import get_output_dir
 
 
 class ModelSaver:
@@ -19,9 +19,9 @@ class ModelSaver:
         saver.save_best(gnn=gnn_model, at=alarm_transformer)
     """
 
-    def __init__(self, base_dir: str = 'data/processed'):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_dir = os.path.join(base_dir, f'model_{timestamp}')
+    def __init__(self, base_dir: str = 'data/processed/model'):
+        # 使用统一的时间戳创建模型保存目录
+        self.output_dir = get_output_dir(base_dir)
         os.makedirs(self.output_dir, exist_ok=True)
         # 临时存储上次保存的 paths
         self.saved_paths = {}
