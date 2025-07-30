@@ -44,6 +44,7 @@ class TrainingConfig:
     early_stop_patience: int
     focal_alpha : float
     focal_gamma : float
+    true_loss_weight : float
 
 
 @dataclass
@@ -69,5 +70,6 @@ def load_config(path: str = "configs/config.yaml") -> Config:
             early_stop_patience=int(cfg['training']['early_stop_patience']),
             focal_alpha=float(cfg['training']['focal_alpha']),
             focal_gamma=float(cfg['training']['focal_gamma']),
+            true_loss_weight=float(cfg['training']['true_loss_weight']),
         ),
     )

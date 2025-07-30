@@ -4,10 +4,11 @@ from torch.optim import Adam
 from torch_geometric.utils import negative_sampling
 from datasets.topo_dataset import TopologyDataset
 from models.gnn_transformer import GNNTransformer
-
+import time
 
 def pretrain_gnn(cfg, epochs: int = 50):
     """简单的无监督边预测任务, 预训练GNN参数"""
+    start_time = time.time()  # 记录预训练开始时间
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ds = TopologyDataset(cfg.data.topo_path)
     x_dict, edge_index_dict, edge_attr_dict = ds[0]
@@ -57,3 +58,5 @@ def pretrain_gnn(cfg, epochs: int = 50):
     os.makedirs(os.path.dirname(cfg.gnn.pretrained_path), exist_ok=True)
     torch.save(model.state_dict(), cfg.gnn.pretrained_path)
     print(f"预训练完成，权重已保存到 {cfg.gnn.pretrained_path}")
+    elapsed = time.time() - start_time
+    print(f"GNN 预训练耗时：{elapsed:.2f} 秒")

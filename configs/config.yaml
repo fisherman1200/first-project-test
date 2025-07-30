@@ -32,3 +32,4 @@ training:
   early_stop_patience : 5
   focal_alpha: 2.0
   focal_gamma: 2.0
+  true_loss_weight: 200.0

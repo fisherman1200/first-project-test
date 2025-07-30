@@ -9,6 +9,7 @@ from transformers import RobertaTokenizer, RobertaModel
 from sklearn.preprocessing import LabelEncoder
 import torch.nn as nn
 import os
+import time
 
 
 class AlarmDataset(Dataset):
@@ -51,6 +52,7 @@ class AlarmDataset(Dataset):
             print(f"在 {preproc_path} 发现预处理过的文件，读取 {len(self.samples)} 条数据")
         else:
             print(f"没有在 {preproc_path} 找到预处理过的数据，开始预处理数据")
+            start_time = time.time()  # 记录预处理开始时间
             # 如果外面给的 map 为空或坐标对不上，就自己从 topo_graph.json 里读
             if node_id_map is None or not node_id_map:
                 with open(json_path, 'r', encoding='utf-8-sig') as f:
@@ -255,6 +257,8 @@ class AlarmDataset(Dataset):
                 'idx_to_device': self.le_dev.classes_.tolist()
             }, preproc_path)
             print(f"预处理完成，保存了 {len(self.samples)} 条数据在 {preproc_path}")
+            elapsed = time.time() - start_time
+            print(f"告警日志预处理耗时：{elapsed:.2f} 秒")
 
 
     def __len__(self):

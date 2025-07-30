@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 import os
@@ -232,7 +233,8 @@ def train_model(cfg):
             loss_true = focal_loss_fn(out_true[mask], true_label[mask])
         else:
             loss_true = out_root.new_tensor(0.0)
-        return loss_root + token_loss + 2.0 * loss_true, loss_root, loss_true, token_loss
+        weighted_true = cfg.training.true_loss_weight * loss_true
+        return loss_root + token_loss + weighted_true, loss_root, loss_true, token_loss
 
     def run_epoch(loader, train=True):
         """运行一个 Epoch，返回损失和评估指标"""
@@ -271,6 +273,7 @@ def train_model(cfg):
                     , total_token/num_batches)
 
     # 使用 tqdm 进度条显示每个 epoch 的平均损失
+    train_start = time.time()  # 记录训练开始时间
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
         # ---- Train ----
@@ -322,6 +325,9 @@ def train_model(cfg):
             if no_improve_times >= cfg.training.early_stop_patience:
                 epoch_bar.write(f"Early stopping at epoch {epoch}")
                 break
+
+    elapsed = time.time() - train_start
+    print(f"训练时间：{elapsed:.2f} 秒")
 
     # —— 训练 & 验证 结束后，加载最佳模型权重，再对 test_loader 评估一次 ——
     print("Loading best model weights and evaluating on TEST set…")
