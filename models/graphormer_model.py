@@ -84,7 +84,7 @@ class HeteroGraphormer(nn.Module):
         for i, d in path_len.items():
             for j, l in d.items():
                 dist[i][j] = min(l, self.max_dist)
-        dist = torch.tensor(dist, dtype=torch.long)
+        dist = torch.tensor(dist, dtype=torch.long, device=self.spatial_emb.weight.device)
         bias = self.spatial_emb(dist)  # [N, N, nhead]
         bias = bias.permute(2, 0, 1)   # [nhead, N, N]
         return bias
@@ -104,8 +104,11 @@ class HeteroGraphormer(nn.Module):
         bias = self._compute_bias(graph)  # [nhead, N, N]
 
         # 计算入度/出度编码
-        in_deg = torch.tensor([graph.in_degree(i) for i in range(N)], dtype=torch.long).clamp(max=31)
-        out_deg = torch.tensor([graph.out_degree(i) for i in range(N)], dtype=torch.long).clamp(max=31)
+        device = self.in_deg_emb.weight.device
+        in_deg = torch.tensor([graph.in_degree(i) for i in range(N)],
+                              dtype=torch.long, device=device).clamp(max=31)
+        out_deg = torch.tensor([graph.out_degree(i) for i in range(N)],
+                               dtype=torch.long, device=device).clamp(max=31)
         feats = feats + self.in_deg_emb(in_deg) + self.out_deg_emb(out_deg)
 
         h = feats.unsqueeze(0)  # [1, N, hidden_dim]

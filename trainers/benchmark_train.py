@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
+from datasets.topo_dataset import TopologyDataset
 from models.benchmark_models import (
     CONAD, LogBERT, LogGD, DeepTraLog,
     Graphormer, GraphMAE, DistilBERTGraph,
@@ -131,6 +132,11 @@ def run_training(cfg, model_name: str, task: str = 'root', epochs: int = 5):
     test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    topo_ds = TopologyDataset(cfg.data.topo_path)
+    _, edge_index_dict, _ = topo_ds[0]
+    edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
+
     model = get_model(model_name, X.shape[1]).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
