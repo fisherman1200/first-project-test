@@ -38,7 +38,7 @@ def get_model(name: str, input_dim: int) -> nn.Module:
     if name == 'conad':
         return CONAD(input_dim)
     if name == 'logbert':
-        return LogBERT()
+        return LogBERT(input_dim)
     if name == 'loggd':
         return LogGD(input_dim)
     if name == 'deeptralog':
@@ -104,7 +104,7 @@ def eval_epoch(model, loader, device):
 
 def run_training(cfg, model_name: str, task: str = 'root', epochs: int = 5):
     """训练指定模型并返回测试指标"""
-    preproc = 'data/processed/processed_alarm_sequences.pt'
+    preproc = 'data/processed/processed_alarm_sequences_v1.pt'
     X, y_root, y_true = load_sequence_features(cfg, preproc)
     if task == 'root':
         y = y_root

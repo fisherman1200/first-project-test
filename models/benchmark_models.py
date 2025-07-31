@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import GATConv, GraphConv
 from transformers import AutoModel
+import os
+
 
 """本文件收录若干用于性能对比的模型实现，
 包括 CONAD、LogBERT、LogGD、DeepTraLog、Graphormer、
@@ -21,6 +23,13 @@ class CONAD(nn.Module):
         self.classifier = nn.Linear(hidden_dim, 2)
 
     def forward(self, x):
+        # 兼容输入形状为 [batch, feat_dim] 的情况，
+        # 此时视为序列长度为 1
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+
+        # x 形状: [batch, seq_len, feat_dim]
+        # h[-1] 形状: [batch, hidden_dim]
         _, (h, _) = self.lstm(x)
         out = self.classifier(h[-1])
         return out
@@ -28,18 +37,20 @@ class CONAD(nn.Module):
 class LogBERT(nn.Module):
     """使用预训练 BERT 的日志表示模型
 
-    直接调用 HuggingFace 上的 BERT 模型，
-    截取 [CLS] 表示后接全连接层完成分类。
+    数据集中已经离线提取好了文本表示及其他特征，本实现
+    直接对这些特征进行两层感知机分类，避免再次调用 BERT。
     """
-    def __init__(self, model_name='bert-base-uncased'):
+    def __init__(self, input_dim: int, hidden_dim: int = 256):
         super().__init__()
-        self.bert = AutoModel.from_pretrained(model_name)
-        self.classifier = nn.Linear(self.bert.config.hidden_size, 2)
+        self.mlp = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 2),
+        )
 
     def forward(self, x, attn_mask=None):
-        out = self.bert(input_ids=x, attention_mask=attn_mask).last_hidden_state
-        pooled = out[:, 0]
-        return self.classifier(pooled)
+        return self.mlp(x)
+
 
 class LogGD(nn.Module):
     """基于图卷积的日志表示模型
@@ -71,6 +82,10 @@ class DeepTraLog(nn.Module):
         self.classifier = nn.Linear(hidden_dim, 2)
 
     def forward(self, x):
+        # 当输入为 [B, D] 时说明已经做过池化，此处补上长度维度
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+
         h, _ = self.lstm(x)
         attn_out, _ = self.attn(h, h, h)
         pooled = attn_out.mean(dim=1)
@@ -92,6 +107,9 @@ class Graphormer(nn.Module):
         self.classifier = nn.Linear(hidden_channels, 2)
 
     def forward(self, x):
+        if x.dim() == 2:
+            # [B, D] -> [B, 1, D]
+            x = x.unsqueeze(1)
         h = self.input_proj(x)
         for layer in self.layers:
             h = layer(h)
@@ -119,9 +137,21 @@ class DistilBERTGraph(nn.Module):
     文本部分使用 DistilBERT 编码，图部分使用 GAT，
     将两种特征拼接后进行分类。
     """
-    def __init__(self, text_model='distilbert-base-uncased', gnn_channels=64):
+    def __init__(self, text_model: str = "distilbert-base-uncased", gnn_channels: int = 64):
         super().__init__()
-        self.bert = AutoModel.from_pretrained(text_model)
+        # 如果设置了离线环境变量，则只从本地缓存读取模型，不尝试联网下载
+        offline = os.getenv("TRANSFORMERS_OFFLINE") == "1" or os.getenv("HF_HUB_OFFLINE") == "1"
+
+        try:
+            self.bert = AutoModel.from_pretrained(text_model, local_files_only=offline)
+        except Exception as e:
+            # 加载失败通常是因为无法联网或本地缓存不存在
+            msg = (
+                "无法加载预训练的 DistilBERT 模型，请确保网络可用，"
+                "或提前下载模型并设置 TRANSFORMERS_OFFLINE=1。"
+            )
+            raise RuntimeError(msg) from e
+
         self.gnn = GATConv(gnn_channels, gnn_channels)
         self.fc = nn.Linear(self.bert.config.hidden_size + gnn_channels, 2)
 

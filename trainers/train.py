@@ -22,7 +22,8 @@ from trainers.losses import FocalLoss
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from utils.eval_plots import plot_confusion, plot_roc
 from trainers.pretrain_gnn import pretrain_gnn
-from models.full_model import FullModel
+# from models.full_model import FullModel
+from models.hetero_full_model import FullModel
 
 
 def train_model(cfg):

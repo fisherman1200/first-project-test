@@ -4,6 +4,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from datasets.alarm_dataset import AlarmDataset
+from collections import Counter
 
 
 def load_sequence_features(cfg, preproc_path='data/processed/processed_alarm_sequences_v1.pt'):
@@ -33,7 +34,12 @@ def load_sequence_features(cfg, preproc_path='data/processed/processed_alarm_seq
         feats.append(seq_feat)
         root_labels.append(root_flag)
         true_labels.append(true_flag)
-    return np.stack(feats), np.array(root_labels), np.array(true_labels)
+    root_arr = np.array(root_labels)
+    true_arr = np.array(true_labels)
+    print("== 标签统计 ==")
+    print("Root:", Counter(root_arr.tolist()))
+    print("True:", Counter(true_arr.tolist()))
+    return np.stack(feats), root_arr, true_arr
 
 
 def evaluate_preds(y_true, y_pred, scores=None):
