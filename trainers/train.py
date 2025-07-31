@@ -76,6 +76,16 @@ def train_model(cfg):
     val_loader = DataLoader(val_ds, batch_size=cfg.data.batch_size, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=cfg.data.batch_size, shuffle=False)
 
+    # --- 第二阶段专用数据加载器：仅包含存在根告警的序列 ---
+    def _filter_root(subset):
+        root_idx = [i for i in subset.indices
+                    if full_alarm_ds[i]['is_root'].max().item() == 1]
+        return torch.utils.data.Subset(full_alarm_ds, root_idx)
+
+    train_loader_stage2 = DataLoader(_filter_root(train_ds), batch_size=cfg.data.batch_size, shuffle=True)
+    val_loader_stage2 = DataLoader(_filter_root(val_ds), batch_size=cfg.data.batch_size, shuffle=False)
+
+
     # (3) 初始化整体模型
     model = FullModel(
         cfg,
@@ -187,8 +197,8 @@ def train_model(cfg):
         """运行一个 Epoch，返回损失和评估指标"""
         model.train() if train else model.eval()
         total_loss = total_root = total_true = total_token = 0.0
-        root_preds, root_labels = [], []       # 根告警指标
-        true_preds, true_labels = [], []     # 真故障指标
+        all_root_preds, all_root_labels = [], []       # 根告警指标
+        all_true_preds, all_true_labels = [], []     # 真故障指标
         context = autocast('cuda', enabled=True) if train else torch.no_grad()
         for batch in tqdm(loader, desc='Train' if train else 'Val',ncols=100, leave=False):
             batch = {k: v.to(device) for k, v in batch.items()}
@@ -206,28 +216,31 @@ def train_model(cfg):
             total_root += l_root.item()
             total_true += l_true.item()
             total_token += l_token.item()
-            root_preds = out_root.argmax(dim=1).detach().cpu()
-            root_labels = batch['is_root'].max(dim=1).values.detach().cpu()
-            root_preds.extend(root_preds.tolist())
-            root_labels.extend(root_labels.tolist())
-            # 仅在存在根告警的样本上评估真故障分类
-            mask = root_labels == 1
-            if mask.any():
-                t_pred = out_true.argmax(dim=1).detach().cpu()[mask]
-                t_label = batch['is_true_fault'].max(dim=1).values.detach().cpu()[mask]
-                true_preds.extend(t_pred.tolist())
-                true_labels.extend(t_label.tolist())
-        num_batches = len(loader)
-        acc = accuracy_score(root_labels, root_preds)
-        precision = precision_score(root_labels, root_preds, zero_division=0)
-        recall = recall_score(root_labels, root_preds, zero_division=0)
-        f1 = f1_score(root_labels, root_preds, zero_division=0)
 
-        if true_labels:
-            acc_t = accuracy_score(true_labels, true_preds)
-            prec_t = precision_score(true_labels, true_preds, zero_division=0)
-            rec_t = recall_score(true_labels, true_preds, zero_division=0)
-            f1_t = f1_score(true_labels, true_preds, zero_division=0)
+            # 先用临时变量存 batch 结果，别覆盖列表
+            batch_root_preds = out_root.argmax(dim=1).detach().cpu().tolist()
+            batch_root_labels = batch['is_root'].max(dim=1).values.detach().cpu().tolist()
+            all_root_preds.extend(batch_root_preds)
+            all_root_labels.extend(batch_root_labels)
+
+            # 仅在存在根告警的样本上评估真故障分类
+            mask = torch.tensor(batch_root_labels, dtype=torch.bool)
+            if mask.any():
+                t_pred = out_true.argmax(dim=1).detach().cpu()[mask].tolist()
+                t_lab = batch['is_true_fault'].max(dim=1).values.detach().cpu()[mask].tolist()
+                all_true_preds.extend(t_pred)
+                all_true_labels.extend(t_lab)
+        num_batches = len(loader)
+        acc = accuracy_score(all_root_labels, all_root_preds)
+        precision = precision_score(all_root_labels, all_root_preds, zero_division=0)
+        recall = recall_score(all_root_labels, all_root_preds, zero_division=0)
+        f1 = f1_score(all_root_labels, all_root_preds, zero_division=0)
+
+        if all_true_labels:
+            acc_t = accuracy_score(all_true_labels, all_true_preds)
+            prec_t = precision_score(all_true_labels, all_true_preds, zero_division=0)
+            rec_t = recall_score(all_true_labels, all_true_preds, zero_division=0)
+            f1_t = f1_score(all_true_labels, all_true_preds, zero_division=0)
         else:
             acc_t = prec_t = rec_t = f1_t = 0.0
 
@@ -242,29 +255,31 @@ def train_model(cfg):
     train_start = time.time()  # 记录训练开始时间
     epoch_bar = tqdm(range(cfg.training.epochs), desc="Epoch", unit="epoch", ncols=100)
     for epoch in epoch_bar:
-        in_true_task = epoch >= cfg.training.stage1_epochs
-        if epoch == cfg.training.stage1_epochs and in_true_task:
+        is_true_task = epoch >= cfg.training.stage1_epochs
+        if epoch == cfg.training.stage1_epochs and is_true_task:
             # 重新计数
             no_improve_times = 0
             best_val = float('inf')
             # 第二阶段：冻结除 true fault 头之外的模块
-            for module in [model.gnn, model.alarm_transformer, model.cross_attention,
-                           model.gating_net, model.shared_root, model.head_root, model.token_root_head]:
+            for module in [model.gnn, model.alarm_transformer,
+                           model.shared_root, model.head_root, model.token_root_head]:
                 for p in module.parameters():
                     p.requires_grad = False
             optimizer = optimizer_true
             scheduler = scheduler_true
 
         # ---- Train ----
+        train_used = train_loader_stage2 if is_true_task else train_loader
         (train_loss, train_root, train_true,
          train_acc, train_prec, train_rec, train_f1,
          train_true_acc, train_true_prec, train_true_rec, train_true_f1,
-         train_token) = run_epoch(train_loader, train=True, in_true_task=in_true_task)
+         train_token) = run_epoch(train_used, train=True, in_true_task=is_true_task)
         # ---- Validation ----
+        val_used = train_loader_stage2 if is_true_task else train_loader
         (val_loss, val_root, val_true,
          val_acc, val_prec, val_rec, val_f1,
          val_true_acc, val_true_prec, val_true_rec, val_true_f1,
-         val_token) = run_epoch(val_loader, train=False, in_true_task=in_true_task)
+         val_token) = run_epoch(val_used, train=False, in_true_task=is_true_task)
 
         # 在进度条尾部显示当前 epoch 的各项损失<在每个 epoch 末尾，拼一个想要的输出
         post_str = (
@@ -314,8 +329,8 @@ def train_model(cfg):
 
         # —— Scheduler & Early Stopping ——
         scheduler.step()
-        monitored_val = val_true if in_true_task else val_root
-        metric_name = "true" if in_true_task else "root"
+        monitored_val = val_true if is_true_task else val_root
+        metric_name = "true" if is_true_task else "root"
         if monitored_val < best_val:
             best_val = monitored_val
             no_improve_times = 0
@@ -371,8 +386,8 @@ def train_model(cfg):
 
     (root_labels, root_probs), (true_labels, true_probs) = eval_with_probs(train_loader)
     _, best_threshold = plot_roc(root_labels, root_probs, "root")
-    root_preds = [1 if p >= best_threshold else 0 for p in root_probs]
-    plot_confusion(root_labels, root_preds, ("Derived", "Root"), "root_confusion")
+    root_preds_opt = [1 if p >= best_threshold else 0 for p in root_probs]
+    plot_confusion(root_labels, root_preds_opt, ("Derived", "Root"), "root_confusion")
     if true_labels:
         _, best_threshold = plot_roc(true_labels, true_probs, "true")
         true_preds_opt = [1 if p >= best_threshold else 0 for p in true_probs]

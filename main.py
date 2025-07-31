@@ -1,6 +1,6 @@
 from trainers.train import train_model
 from utils.config import load_config
-import argparse
+from trainers.benchmark_train import train_benchmark
 from trainers.anomaly_train import train_anomaly
 
 
@@ -9,7 +9,11 @@ from trainers.anomaly_train import train_anomaly
 
 def main():
     # 可选算法列表
-    VALID_ALGOS = ['my', 'pca', 'isoforest', 'ocsvm']
+    VALID_ALGOS = [
+        'my', 'pca', 'isoforest', 'ocsvm',
+        'conad', 'logbert', 'loggd', 'deeptralog',
+        'graphormer', 'graphmae', 'distilbertgraph'
+    ]
 
     # 2. 运行时交互式输入
     print("可选算法：", ", ".join(VALID_ALGOS))
@@ -24,8 +28,10 @@ def main():
     # 4. 根据输入分支
     if algo == 'my':
         train_model(cfg)
-    else:
+    elif algo in {'pca', 'isoforest', 'ocsvm'}:
         train_anomaly(cfg, algo)
+    else:
+        train_benchmark(cfg, algo)
 
 
 if __name__ == '__main__':
