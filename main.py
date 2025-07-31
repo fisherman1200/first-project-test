@@ -4,7 +4,7 @@ import argparse
 from trainers.anomaly_train import train_anomaly
 
 
-# TODO: 重构使用方法，再设计几个模型进行比较，拆分GNN和Transformer功能比较。或者就再写训练逻辑。比如CONAD，LogBERT，LogGD，DeepTraLog
+# TODO: 重构使用方法，再设计几个模型进行比较，拆分GNN和Transformer功能比较。或者就再写训练逻辑。
 
 
 def main():
