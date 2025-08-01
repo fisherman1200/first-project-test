@@ -33,7 +33,7 @@ class SequenceDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-def get_model(name: str, input_dim: int) -> nn.Module:
+def get_model(name: str, input_dim: int, edge_index) -> nn.Module:
     """根据名称实例化模型"""
     name = name.lower()
     if name == 'conad':
@@ -41,13 +41,13 @@ def get_model(name: str, input_dim: int) -> nn.Module:
     if name == 'logbert':
         return LogBERT(input_dim)
     if name == 'loggd':
-        return LogGD(input_dim)
+        return LogGD(input_dim, edge_index)
     if name == 'deeptralog':
         return DeepTraLog(input_dim)
     if name == 'graphormer':
         return Graphormer(input_dim)
     if name == 'graphmae':
-        return GraphMAE(input_dim)
+        return GraphMAE(input_dim, edge_index)
     if name == 'distilbertgraph':
         return DistilBERTGraph(gnn_channels=input_dim)
     raise ValueError(f'未知模型: {name}')
@@ -134,10 +134,24 @@ def run_training(cfg, model_name: str, task: str = 'root', epochs: int = 5):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     topo_ds = TopologyDataset(cfg.data.topo_path)
-    _, edge_index_dict, _ = topo_ds[0]
+    x_dict, edge_index_dict, _ = topo_ds[0]
+    x_dict = {k: v.to(device) for k, v in x_dict.items()}
     edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
+    # 计算各类型节点在整体顺序中的偏移量
+    offset = {
+        'core': 0,
+        'agg': x_dict['core'].size(0),
+        'access': x_dict['core'].size(0) + x_dict['agg'].size(0),
+    }
+    # 把 edge_index_dict 中的局部索引转换为全局索引并合并
+    edges = []
+    for (src_type, _, tgt_type), eidx in edge_index_dict.items():
+        src = eidx[0] + offset[src_type]
+        tgt = eidx[1] + offset[tgt_type]
+        edges.append(torch.stack([src, tgt], dim=0))
+    edge_index = torch.cat(edges, dim=1)
 
-    model = get_model(model_name, X.shape[1]).to(device)
+    model = get_model(model_name, X.shape[1], edge_index).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     best_f1 = 0.0
