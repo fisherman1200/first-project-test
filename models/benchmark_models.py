@@ -11,6 +11,31 @@ GraphMAE 以及 DistilBERTGraph 多模态模型。
 实现均为简化示例，方便在本项目中快速实验。
 """
 
+class GraphRepeatMixin:
+    """为图神经网络模型提供 ``_repeat_graph`` 工具方法的混入类"""
+
+    def __init__(self):
+        self.edge_index = None
+        self.num_nodes = None
+
+    def _repeat_graph(self, x):
+        """按批量复制图结构，展开节点特征
+
+        参数 ``x`` 的形状为 ``[batch, feat_dim]``，方法会根据
+        ``self.num_nodes`` 和 ``self.edge_index`` 将每个样本复制成
+        一个完整的图结构，返回展开后的特征和对应的边索引。
+        """
+
+        bsz = x.size(0)
+        # [B, F] -> [B, N, F] -> [B*N, F]
+        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
+
+        # 复制边索引并在不同批次间添加偏移量
+        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
+        edge = self.edge_index.unsqueeze(0) + offset
+        edge = edge.reshape(2, -1)
+        return x_rep, edge
+
 class CONAD(nn.Module):
     """基于 LSTM 的简化版 CONAD 模型
 
@@ -52,7 +77,7 @@ class LogBERT(nn.Module):
         return self.mlp(x)
 
 
-class LogGD(nn.Module):
+class LogGD(nn.Module, GraphRepeatMixin):
     """基于图卷积的日志表示模型
     使用两层 ``GraphConv`` 提取节点间的结构信息，
     然后平均池化得到图级表示。模型内部会根据 ``edge_index``
@@ -66,18 +91,6 @@ class LogGD(nn.Module):
         self.conv1 = GraphConv(in_channels, hidden_channels)
         self.conv2 = GraphConv(hidden_channels, hidden_channels)
         self.classifier = nn.Linear(hidden_channels, 2)
-
-    def _repeat_graph(self, x):
-        """将批量特征展开为 ``batch_size*num_nodes`` 个节点"""
-        bsz = x.size(0)
-        # [B, F] -> [B, N, F] -> [B*N, F]
-        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
-
-        # 边索引也按批量复制，并在不同批次间加上偏移量
-        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
-        edge = self.edge_index.unsqueeze(0) + offset
-        edge = edge.reshape(2, -1)
-        return x_rep, edge
 
     def forward(self, x):
         """前向传播，``x`` 形状为 ``[batch, feat_dim]``"""
@@ -135,7 +148,7 @@ class Graphormer(nn.Module):
         pooled = h.mean(dim=1)
         return self.classifier(pooled)
 
-class GraphMAE(nn.Module):
+class GraphMAE(nn.Module, GraphRepeatMixin):
     """图自编码器，用于无监督预训练
 
     输入图经过编码得到隐藏向量，再重构回原特征，
@@ -149,16 +162,6 @@ class GraphMAE(nn.Module):
         self.decoder = nn.Linear(hidden_channels, in_channels)
         self.classifier = nn.Linear(hidden_channels, 2)
 
-    def _repeat_graph(self, x):
-        bsz = x.size(0)
-        # [B, F] -> [B, N, F] -> [B*N, F]
-        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
-        # 复制边索引并添加批量偏移量
-        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
-        edge = self.edge_index.unsqueeze(0) + offset
-        edge = edge.reshape(2, -1)
-        return x_rep, edge
-
     def forward(self, x):
         """计算并返回二分类 logits"""
         x_rep, edge = self._repeat_graph(x)
@@ -167,7 +170,7 @@ class GraphMAE(nn.Module):
         h = h.view(x.size(0), self.num_nodes, -1).mean(dim=1)
         return self.classifier(h)
 
-class DistilBERTGraph(nn.Module):
+class DistilBERTGraph(nn.Module, GraphRepeatMixin):
     """DistilBERT 与 GNN 融合的多模态模型
 
     文本部分使用 DistilBERT 编码，图部分使用 GAT，
@@ -199,15 +202,6 @@ class DistilBERTGraph(nn.Module):
 
         self.gnn = GATConv(self.gnn_in_dim, self.gnn_in_dim)
         self.fc = nn.Linear(self.text_dim + self.gnn_in_dim, 2)
-
-    def _repeat_graph(self, x):
-        """把批量特征扩展成整图输入"""
-        bsz = x.size(0)
-        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
-        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
-        edge = self.edge_index.unsqueeze(0) + offset
-        edge = edge.reshape(2, -1)
-        return x_rep, edge
 
     def forward(self, x):
         """计算并返回二分类 logits"""
