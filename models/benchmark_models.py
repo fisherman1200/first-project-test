@@ -173,7 +173,7 @@ class DistilBERTGraph(nn.Module):
     文本部分使用 DistilBERT 编码，图部分使用 GAT，
     将两种特征拼接后进行分类。
     """
-    def __init__(self, text_model: str = "distilbert-base-uncased", gnn_channels: int = 64):
+    def __init__(self, in_channels, edge_index, text_model: str = "distilbert-base-uncased"):
         super().__init__()
         # 如果设置了离线环境变量，则只从本地缓存读取模型，不尝试联网下载
         offline = os.getenv("TRANSFORMERS_OFFLINE") == "1" or os.getenv("HF_HUB_OFFLINE") == "1"
@@ -188,11 +188,35 @@ class DistilBERTGraph(nn.Module):
             )
             raise RuntimeError(msg) from e
 
-        self.gnn = GATConv(gnn_channels, gnn_channels)
-        self.fc = nn.Linear(self.bert.config.hidden_size + gnn_channels, 2)
+        # 文本向量维度
+        self.text_dim = self.bert.config.hidden_size
+        # 计算 GNN 输入维度：总维度减去文本维度
+        self.gnn_in_dim = max(in_channels - self.text_dim, 1)
 
-    def forward(self, text_ids, text_mask, x, edge_index):
-        text_feat = self.bert(input_ids=text_ids, attention_mask=text_mask).last_hidden_state[:,0]
-        gnn_feat = torch.relu(self.gnn(x, edge_index)).mean(dim=0)
+        # 图结构常量在初始化时传入并保存
+        self.register_buffer("edge_index", edge_index)
+        self.num_nodes = int(edge_index.max()) + 1
+
+        self.gnn = GATConv(self.gnn_in_dim, self.gnn_in_dim)
+        self.fc = nn.Linear(self.text_dim + self.gnn_in_dim, 2)
+
+    def _repeat_graph(self, x):
+        """把批量特征扩展成整图输入"""
+        bsz = x.size(0)
+        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
+        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
+        edge = self.edge_index.unsqueeze(0) + offset
+        edge = edge.reshape(2, -1)
+        return x_rep, edge
+
+    def forward(self, x):
+        """计算并返回二分类 logits"""
+        # 拆分文本与图特征
+        text_feat = x[:, : self.text_dim]
+        gnn_x = x[:, self.text_dim:]
+
+        x_rep, edge = self._repeat_graph(gnn_x)
+        gnn_feat = torch.relu(self.gnn(x_rep, edge))
+        gnn_feat = gnn_feat.view(x.size(0), self.num_nodes, -1).mean(dim=1)
         fused = torch.cat([text_feat, gnn_feat], dim=-1)
         return self.fc(fused)

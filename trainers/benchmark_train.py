@@ -50,7 +50,7 @@ def get_model(name: str, input_dim: int, edge_index) -> nn.Module:
     if name == 'graphmae':
         return GraphMAE(input_dim, edge_index)
     if name == 'distilbertgraph':
-        return DistilBERTGraph(gnn_channels=input_dim)
+        return DistilBERTGraph(input_dim, edge_index)
     raise ValueError(f'未知模型: {name}')
 
 
