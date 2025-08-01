@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
+from transformers import AutoTokenizer
 
 from datasets.topo_dataset import TopologyDataset
 from models.benchmark_models import (

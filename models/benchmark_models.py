@@ -54,20 +54,39 @@ class LogBERT(nn.Module):
 
 class LogGD(nn.Module):
     """基于图卷积的日志表示模型
-
-    使用两层 GraphConv 提取节点间的结构信息，
-    然后平均池化得到图级表示。
+    使用两层 ``GraphConv`` 提取节点间的结构信息，
+    然后平均池化得到图级表示。模型内部会根据 ``edge_index``
+    自动处理批量维度。输入 ``x`` 为 ``[B, F]`` 的序列级特征。
     """
-    def __init__(self, in_channels, hidden_channels=64):
+    def __init__(self, in_channels, edge_index, hidden_channels=64):
         super().__init__()
+        # 保存图结构并预计算节点数，方便批量展开
+        self.register_buffer("edge_index", edge_index)
+        self.num_nodes = int(edge_index.max()) + 1
         self.conv1 = GraphConv(in_channels, hidden_channels)
         self.conv2 = GraphConv(hidden_channels, hidden_channels)
         self.classifier = nn.Linear(hidden_channels, 2)
 
-    def forward(self, x, edge_index):
-        h = torch.relu(self.conv1(x, edge_index))
-        h = torch.relu(self.conv2(h, edge_index))
-        return self.classifier(h.mean(dim=0))
+    def _repeat_graph(self, x):
+        """将批量特征展开为 ``batch_size*num_nodes`` 个节点"""
+        bsz = x.size(0)
+        # [B, F] -> [B, N, F] -> [B*N, F]
+        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
+
+        # 边索引也按批量复制，并在不同批次间加上偏移量
+        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
+        edge = self.edge_index.unsqueeze(0) + offset
+        edge = edge.reshape(2, -1)
+        return x_rep, edge
+
+    def forward(self, x):
+        """前向传播，``x`` 形状为 ``[batch, feat_dim]``"""
+        x_rep, edge = self._repeat_graph(x)
+        h = torch.relu(self.conv1(x_rep, edge))
+        h = torch.relu(self.conv2(h, edge))
+        h = h.view(x.size(0), self.num_nodes, -1).mean(dim=1)
+        # 图级向量经过线性层得到二分类结果
+        return self.classifier(h)
 
 class DeepTraLog(nn.Module):
     """使用注意力的日志序列模型
@@ -122,14 +141,31 @@ class GraphMAE(nn.Module):
     输入图经过编码得到隐藏向量，再重构回原特征，
     可在大规模数据上学习通用表示。
     """
-    def __init__(self, in_channels, hidden_channels=64):
+    def __init__(self, in_channels, edge_index, hidden_channels=64):
         super().__init__()
+        self.register_buffer("edge_index", edge_index)
+        self.num_nodes = int(edge_index.max()) + 1
         self.encoder = GraphConv(in_channels, hidden_channels)
         self.decoder = nn.Linear(hidden_channels, in_channels)
+        self.classifier = nn.Linear(hidden_channels, 2)
 
-    def forward(self, x, edge_index):
-        h = torch.relu(self.encoder(x, edge_index))
-        return self.decoder(h)
+    def _repeat_graph(self, x):
+        bsz = x.size(0)
+        # [B, F] -> [B, N, F] -> [B*N, F]
+        x_rep = x.unsqueeze(1).expand(-1, self.num_nodes, -1).reshape(-1, x.size(1))
+        # 复制边索引并添加批量偏移量
+        offset = torch.arange(bsz, device=x.device).view(bsz, 1, 1) * self.num_nodes
+        edge = self.edge_index.unsqueeze(0) + offset
+        edge = edge.reshape(2, -1)
+        return x_rep, edge
+
+    def forward(self, x):
+        """计算并返回二分类 logits"""
+        x_rep, edge = self._repeat_graph(x)
+        h = torch.relu(self.encoder(x_rep, edge))
+        # [B*N, H] -> [B, N, H] -> [B, H]
+        h = h.view(x.size(0), self.num_nodes, -1).mean(dim=1)
+        return self.classifier(h)
 
 class DistilBERTGraph(nn.Module):
     """DistilBERT 与 GNN 融合的多模态模型
