@@ -50,6 +50,8 @@ class AlarmDataset(Dataset):
             self.le_node = LabelEncoder().fit(self.idx_to_node)
             self.le_dev = LabelEncoder().fit(self.idx_to_device)
             print(f"在 {preproc_path} 发现预处理过的文件，读取 {len(self.samples)} 条数据")
+            # 加载完成后统计数据集中告警分布
+            self.report_stats()
         else:
             print(f"没有在 {preproc_path} 找到预处理过的数据，开始预处理数据")
             start_time = time.time()  # 记录预处理开始时间
@@ -259,6 +261,8 @@ class AlarmDataset(Dataset):
             print(f"预处理完成，保存了 {len(self.samples)} 条数据在 {preproc_path}")
             elapsed = time.time() - start_time
             print(f"告警日志预处理耗时：{elapsed:.2f} 秒")
+            # 加载完成后统计数据集中告警分布
+            self.report_stats()
 
 
     def __len__(self):
@@ -276,40 +280,11 @@ class AlarmDataset(Dataset):
                """
         return self.samples[idx]
 
-
-# 脚本测试
-if __name__ == '__main__':
-    with open('../data/topo_graph.json', 'r', encoding='utf-8') as f:
-        topo = json.load(f)
-    # 建立一个干净的 map：ID -> idx+1
-    node_id_map = {n['id'].strip(): i + 1
-                   for i, n in enumerate(topo['nodes'])}
-
-    # 构建并导出 AlarmDataset
-    ds = AlarmDataset('../data/alarms.json', node_id_map, max_len=16, window_milliseconds=5000, step_milliseconds=500)
-
-    out = []
-    for sample in ds:
-        out.append({
-            'node_idxs': sample['node_idxs'].tolist(),
-            'text_feat': sample['text_feat'].tolist(),
-            'is_root': sample['is_root'].tolist(),
-            'is_true_fault': sample['is_true_fault'].tolist()
-        })
-
-    # 导出到 data/processed_alarm_sequences.json
-    with open('../data/processed_alarm_sequences.json', 'w', encoding='utf-8') as f:
-        import json
-
-        json.dump(out, f, ensure_ascii=False, indent=2)
-
-    print(f"已导出 {len(out)} 条告警序列到 data/processed_alarm_sequences.json")
-
-    # 统计是否存在根源告警
-    count_root = sum(1 for seq in out if max(seq['is_root']) == 1)
-
-    # 统计是否存在真实故障
-    count_true = sum(1 for seq in out if max(seq['is_true_fault']) == 1)
-
-    print(f"根源告警共有：{count_root} 条，衍生告警共有：{len(out)-count_root}条")
-    print(f"真实故障共有：{count_true} 条，非真实故障有:{count_root-count_true}条")
+    def report_stats(self):
+        """统计并打印告警类别分布"""
+        # 统计包含根源告警的序列数量
+        count_root = sum(1 for s in self.samples if s['is_root'].max() == 1)
+        # 统计包含真实故障的序列数量
+        count_true = sum(1 for s in self.samples if s['is_true_fault'].max() == 1)
+        print(f"根源告警共有：{count_root} 条，衍生告警共有：{len(self.samples) - count_root} 条")
+        print(f"真实故障共有：{count_true} 条，非真实根源告警有：{count_root - count_true} 条")

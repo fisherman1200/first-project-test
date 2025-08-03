@@ -99,8 +99,8 @@ def train_anomaly(cfg, method='pca'):
         return preds, scores
 
     # 根因检测评估
-    preds_root, scores_root = fit_predict_scores(X_train_root, X_test_root)
     print("root任务：")
+    preds_root, scores_root = fit_predict_scores(X_train_root, X_test_root)
     evaluate_preds(y_test_root, preds_root, scores_root)
 
     # -------- 真实故障检测 --------
@@ -114,6 +114,6 @@ def train_anomaly(cfg, method='pca'):
     if len(X_train_true) == 0:
         print("没有非真实故障样本可用于训练，跳过真实故障检测")
         return
-    preds_true, scores_true = fit_predict_scores(X_train_true, X_root)
     print("true任务：")
+    preds_true, scores_true = fit_predict_scores(X_train_true, X_root)
     evaluate_preds(y_true_root, preds_true, scores_true)

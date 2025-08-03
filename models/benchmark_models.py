@@ -214,3 +214,23 @@ class DistilBERTGraph(nn.Module, GraphRepeatMixin):
         gnn_feat = gnn_feat.view(x.size(0), self.num_nodes, -1).mean(dim=1)
         fused = torch.cat([text_feat, gnn_feat], dim=-1)
         return self.fc(fused)
+
+
+# 模型名称到实现的映射
+BENCHMARK_MODEL_REGISTRY = {
+    "conad": CONAD,
+    "logbert": LogBERT,
+    "loggd": LogGD,
+    "deeptralog": DeepTraLog,
+    "graphormer": Graphormer,
+    "graphmae": GraphMAE,
+    "distilbertgraph": DistilBERTGraph,
+}
+
+
+def get_benchmark_model(name: str, *args, **kwargs) -> nn.Module:
+    """根据名称实例化基准模型"""
+    name = name.lower()
+    if name not in BENCHMARK_MODEL_REGISTRY:
+        raise ValueError(f"未知模型: {name}")
+    return BENCHMARK_MODEL_REGISTRY[name](*args, **kwargs)

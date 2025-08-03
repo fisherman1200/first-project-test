@@ -1,10 +1,6 @@
 from trainers.train import train_model
 from utils.config import load_config
-from trainers.benchmark_train import train_benchmark
-from trainers.anomaly_train import train_anomaly
-
-
-# TODO: 重构使用方法，再设计几个模型进行比较，拆分GNN和Transformer功能比较。或者就再写训练逻辑。
+from trainers.algorithm_train import train_algorithm
 
 
 def main():
@@ -28,11 +24,8 @@ def main():
     # 4. 根据输入分支
     if algo == 'my':
         train_model(cfg)
-    elif algo in {'pca', 'isoforest', 'ocsvm'}:
-        train_anomaly(cfg, algo)
     else:
-        train_benchmark(cfg, algo)
-
+        train_algorithm(cfg, algo)
 
 if __name__ == '__main__':
     main()
