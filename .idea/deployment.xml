@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="vGPU-48GB-425W" remoteFilesAllowedToDisappearOnAutoupload="false" showExcludedInSync="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="RTX 4090" remoteFilesAllowedToDisappearOnAutoupload="false" showExcludedInSync="true">
     <serverData>
-      <paths name="root@connect.bjb1.seetacloud.com:20160 password">
+      <paths name="RTX 4090">
         <serverdata>
           <mappings>
             <mapping deploy="/root/autodl-tmp/test1" local="$PROJECT_DIR$" />

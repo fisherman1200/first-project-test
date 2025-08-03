@@ -36,9 +36,9 @@ def load_sequence_features(cfg, preproc_path='data/processed/processed_alarm_seq
         true_labels.append(true_flag)
     root_arr = np.array(root_labels)
     true_arr = np.array(true_labels)
-    print("== 标签统计 ==")
-    print("Root:", Counter(root_arr.tolist()))
-    print("True:", Counter(true_arr.tolist()))
+    # print("== 标签统计 ==")
+    # print("Root:", Counter(root_arr.tolist()))
+    # print("True:", Counter(true_arr.tolist()))
     return np.stack(feats), root_arr, true_arr
 
 

@@ -143,9 +143,6 @@ def train_once(cfg, model_name: str, task: str = "root", epochs: int = 5):
         model, test_loader, device
     )
     evaluate_preds(labels, preds, scores)
-    print(
-        f"Accuracy: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}, AUC: {auc:.4f}"
-    )
     return {
         "loss": loss,
         "acc": acc,
