@@ -14,10 +14,12 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
-
 from datasets.topo_dataset import TopologyDataset
 from models.benchmark_models import get_benchmark_model
 from trainers.anomaly_train import load_sequence_features, evaluate_preds
+from utils.metrics_utils import MetricsLogger
+from utils.visualize_embeddings import plot_tsne
+from utils.eval_plots import plot_confusion, plot_roc
 
 
 class SequenceDataset(Dataset):
@@ -54,7 +56,10 @@ def build_edge_index(cfg, device):
 
 
 def run_epoch(model, loader, device, optimizer=None):
-    """执行一轮训练或评估"""
+    """
+    执行一轮训练或评估
+    返回: loss, acc, precision, recall, f1, auc, preds, labels, scores
+    """
     train_mode = optimizer is not None
     model.train() if train_mode else model.eval()
     criterion = torch.nn.CrossEntropyLoss()
@@ -95,7 +100,11 @@ def run_epoch(model, loader, device, optimizer=None):
 
 
 def train_once(cfg, model_name: str, task: str = "root", epochs: int = 5):
-    """训练指定模型，返回测试集指标"""
+    """
+    训练指定模型，返回测试集指标
+    此函数同时记录训练/验证过程中的指标，并生成可视化图表，
+    以便不同网络之间对比。
+    """
     preproc = "data/processed/processed_alarm_sequences_v1.pt"
     X, y_root, y_true = load_sequence_features(cfg, preproc)
     if task == "root":
@@ -127,22 +136,76 @@ def train_once(cfg, model_name: str, task: str = "root", epochs: int = 5):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     edge_index = build_edge_index(cfg, device)
-    model = get_benchmark_model(model_name, X.shape[1], edge_index).to(device)
+    # 根据模型是否需要图结构，决定是否传入 ``edge_index``
+    if model_name.lower() in {"loggd", "graphmae", "distilbertgraph"}:
+        # 这些模型内部包含图神经网络，需要额外的边索引信息
+        model = get_benchmark_model(model_name, X.shape[1], edge_index).to(device)
+    else:
+        # 其余模型仅依赖特征维度即可
+        model = get_benchmark_model(model_name, X.shape[1]).to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
+    # 记录训练过程中的指标，便于绘制曲线
+    logger = MetricsLogger([
+        "train_loss", "train_acc", "train_precision", "train_recall", "train_f1", "train_auc",
+        "val_loss", "val_acc", "val_precision", "val_recall", "val_f1", "val_auc",
+    ])
+
+
     best_f1, best_state = 0.0, model.state_dict()
-    for _ in range(epochs):
-        run_epoch(model, train_loader, device, optimizer)
-        _, _, _, _, f1, _, _, _, _ = run_epoch(model, val_loader, device)
-        if f1 > best_f1:
-            best_f1 = f1
+    for epoch in range(1, epochs + 1):
+        # 训练阶段
+        t_loss, t_acc, t_prec, t_rec, t_f1, t_auc, *_ = run_epoch(
+            model, train_loader, device, optimizer
+        )
+        # 验证阶段
+        v_loss, v_acc, v_prec, v_rec, v_f1, v_auc, *_ = run_epoch(
+            model, val_loader, device
+        )
+        # 记录本轮指标
+        logger.add(epoch, {
+            "train_loss": t_loss,
+            "train_acc": t_acc,
+            "train_precision": t_prec,
+            "train_recall": t_rec,
+            "train_f1": t_f1,
+            "train_auc": t_auc,
+            "val_loss": v_loss,
+            "val_acc": v_acc,
+            "val_precision": v_prec,
+            "val_recall": v_rec,
+            "val_f1": v_f1,
+            "val_auc": v_auc,
+        })
+        # 选择在验证集上 F1 最优的模型参数
+        if v_f1 > best_f1:
+            best_f1 = v_f1
             best_state = model.state_dict()
 
     model.load_state_dict(best_state)
+    # 在测试集上评估
     loss, acc, prec, rec, f1, auc, preds, labels, scores = run_epoch(
         model, test_loader, device
     )
     evaluate_preds(labels, preds, scores)
+
+    # 绘制 ROC 曲线与混淆矩阵
+    prefix = f"{model_name}_{task}"
+    if task == "root":
+        class_names = ("Derived", "Root")
+    else:
+        class_names = ("NonFault", "True")
+    _, best_thr = plot_roc(labels, scores, prefix)
+    preds_opt = [1 if s >= best_thr else 0 for s in scores]
+    plot_confusion(labels, preds_opt, class_names, prefix + "_confusion")
+
+    # 使用输入特征可视化 t-SNE 嵌入分布
+    plot_tsne(X_test, y_test, f"t-SNE: {model_name} {task}", prefix + "_tsne", names=class_names)
+
+    # 保存指标 JSON，文件名前缀包含模型与任务名称
+    logger.save(prefix)
+
     return {
         "loss": loss,
         "acc": acc,

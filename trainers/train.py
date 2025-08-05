@@ -397,7 +397,7 @@ def train_model(cfg):
 
     # —— 可视化 & 其他后处理 ——
     # utils-> plot_metrics: 生成metrics数据json
-    logger.save()
+    logger.save(prefix='full_model')
 
     # utils-> visualize_embeddings 绘制聚类效果图
     # 提取 embeddings 和标签

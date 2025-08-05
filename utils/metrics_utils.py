@@ -13,7 +13,8 @@ class MetricsLogger:
         for epoch in ...:
             # 计算 avg_metrics = {'root': avg_root, 'true': avg_true, 'acc': avg_acc}
             logger.add(epoch, avg_metrics)
-        logger.save('data/processed/metrics.json')
+        # 保存结果到 data/raw/metrics_data/ 时间戳目录下，文件名前缀可自定义
+        logger.save(prefix='my_model')
     """
     def __init__(self, keys: List[str]):
         # keys: 指标名列表
@@ -32,13 +33,18 @@ class MetricsLogger:
                 raise KeyError(f"Metrics for key '{k}' missing in metrics dict.")
             self.data[k].append(metrics[k])
 
-    def save(self) -> None:
+    def save(self, prefix: str = "metrics_data") -> str:
         """
         将收集到的指标保存为 JSON 文件，包含 epochs 列表和每个 key 对应的值。
+        参数:
+            prefix: 输出文件名前缀，便于区分不同模型/实验。
+
+        返回:
+            输出文件的完整路径。
         """
         # 生成默认输出目录和文件名，目录带有统一的运行时间戳
         default_dir = get_output_dir('data', 'raw', 'metrics_data')
-        filename = f'metrics_data.json'
+        filename = f'{prefix}.json'
         output_path = os.path.join(default_dir, filename)
 
         os.makedirs(default_dir, exist_ok=True)
@@ -46,8 +52,5 @@ class MetricsLogger:
         out['epoch'] = self.epochs
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
-
-# 示例：
-# logger = MetricsLogger(['root', 'true', 'acc'])
-# logger.add(epoch, {'root': avg_root, 'true': avg_true, 'acc': avg_acc})
-# logger.save()
+        # 返回输出路径，方便外部记录
+        return output_path
