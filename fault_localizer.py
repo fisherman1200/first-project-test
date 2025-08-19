@@ -3,8 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 from datasets.topo_dataset import TopologyDataset
 from datasets.alarm_dataset import AlarmDataset
-from models.gnn_transformer import GNNTransformer
-from models.alarm_transformer import AlarmTransformer
+from models.hetero_full_model import FullModel
 from utils.config import load_config
 
 
@@ -13,7 +12,7 @@ def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
 
     参数:
         cfg_path: 配置文件路径
-        model_dir: 模型权重所在目录，应包含 ``best_gnn.pth``、``best_at.pth``、``best_token.pth``
+        model_dir: 模型权重所在目录，应包含 ``best_model.pth``
         top_k: 选取概率最高的前 k 个告警作为候选根因
     返回:
         List[Dict] 形如 [{'fault': True, 'node': '北京', 'device': 'dev1'}, ...]
@@ -31,46 +30,30 @@ def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
 
     loader = DataLoader(alarm_ds, batch_size=1, shuffle=False)
 
-    # ----- 加载模型 -----
-    gnn = GNNTransformer(in_channels=topo_ds.feature_dim,
-                         hidden_channels=cfg.gnn.hidden_channels,
-                         num_layers=cfg.gnn.num_layers,
-                         dropout=cfg.gnn.dropout).to(device)
-    gnn.load_state_dict(torch.load(os.path.join(model_dir, 'best_gnn.pth'), map_location=device))
-    at = AlarmTransformer(input_dim=alarm_ds[0]['text_feat'].shape[1],
-                          emb_dim=cfg.transformer.emb_dim,
-                          nhead=cfg.transformer.nhead,
-                          hid_dim=cfg.transformer.hid_dim,
-                          nlayers=cfg.transformer.nlayers,
-                          max_len=cfg.transformer.max_len,
-                          dropout=cfg.transformer.dropout).to(device)
-    at.load_state_dict(torch.load(os.path.join(model_dir, 'best_at.pth'), map_location=device))
-    token_head = torch.nn.Linear(cfg.transformer.emb_dim, 2).to(device)
-    token_head.load_state_dict(torch.load(os.path.join(model_dir, 'best_token.pth'), map_location=device))
+    # ----- 加载整体模型 -----
+    model = FullModel(cfg, topo_ds.feature_dim,
+                      alarm_ds[0]['text_feat'].shape[1]).to(device)
+    state_path = os.path.join(model_dir, 'best_model.pth')  # 模型权重文件路径
+    model.load_state_dict(torch.load(state_path, map_location=device))
+    model.eval()  # 切换到评估模式
 
-    gnn.eval(); at.eval(); token_head.eval()
-
-    # 预计算节点嵌入
+    # 预计算并缓存所有节点嵌入
     with torch.no_grad():
         x_dict, edge_index_dict, edge_attr_dict = topo_ds[0]
         x_dict = {k: v.to(device) for k, v in x_dict.items()}
         edge_index_dict = {k: v.to(device) for k, v in edge_index_dict.items()}
         edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
-        h_dict = gnn(x_dict, edge_index_dict, edge_attr_dict)
-        pad = torch.zeros(1, cfg.gnn.hidden_channels, device=device)
-        node_embs = torch.cat([pad, h_dict['core'], h_dict['agg'], h_dict['access']], dim=0).detach()
+        model.compute_node_embs(x_dict, edge_index_dict, edge_attr_dict)
 
     results = []
     for sample in loader:
+        # 将样本字典中的张量移动到指定设备
         sample = {k: v.to(device) for k, v in sample.items()}
-        # 节点特征
-        seq_node_embs = node_embs[sample['node_idxs']]
-        node_feat = seq_node_embs.mean(dim=1)
-        # Transformer 特征及序列预测
-        pooled, seq_feat = at(sample['text_feat'], return_seq=True)
-        token_logits = token_head(seq_feat)
-        prob = token_logits.softmax(dim=-1)[..., 1]  # [1, L]
-        # 取概率最高的位置
+        with torch.no_grad():
+            # 前向推理得到序列级根因概率
+            _, _, token_logits = model(sample)
+            prob = token_logits.softmax(dim=-1)[..., 1]
+        # 取概率最高的告警位置
         topk = prob.topk(top_k, dim=1)
         idx = topk.indices[0]
         is_fault = prob.max().item() > 0.5
@@ -87,5 +70,5 @@ def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
 
 if __name__ == '__main__':
     import json
-    res = localize_fault('../configs/config.yaml', '../data/processed/model_xxxx', top_k=3)
+    res = localize_fault('configs/config.yaml', 'data/processed/model/20250813_005148', top_k=3)
     print(json.dumps(res, ensure_ascii=False, indent=2))
