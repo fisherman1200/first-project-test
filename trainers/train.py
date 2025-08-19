@@ -94,6 +94,8 @@ def train_model(cfg):
         full_alarm_ds[0]['text_feat'].shape[1]
     ).to(device)
 
+    # print(model)
+
     if cfg.gnn.pretrained_path:
         # 文件存在 → 直接加载
         if os.path.exists(cfg.gnn.pretrained_path):

@@ -1,7 +1,12 @@
 from trainers.train import train_model
 from utils.config import load_config
 from trainers.algorithm_train import train_algorithm
-
+import torch
+torch.backends.fp32_precision = "ieee"
+torch.backends.cuda.matmul.fp32_precision = "ieee"
+torch.backends.cudnn.fp32_precision = "ieee"
+torch.backends.cudnn.conv.fp32_precision = "tf32"
+torch.backends.cudnn.rnn.fp32_precision = "tf32"
 
 def main():
     # 可选算法列表

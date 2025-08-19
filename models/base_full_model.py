@@ -5,6 +5,50 @@ from torch.nn import MultiheadAttention
 from models.alarm_transformer import AlarmTransformer
 
 
+# ===== add: GLU前馈块 =====
+class GLUFeedForward(nn.Module):
+    """
+    in_dim -> (2*hidden) split -> u * act(v) -> dropout -> out_dim
+    variant: 'geglu' or 'swiglu'
+    """
+    def __init__(self, in_dim, hidden, out_dim, variant='geglu', dropout=0.0):
+        super().__init__()
+        self.fc_in = nn.Linear(in_dim, hidden * 2)
+        if variant == 'geglu':
+            self.act = nn.GELU()
+        elif variant == 'swiglu':
+            self.act = nn.SiLU()
+        else:
+            raise ValueError(f"Unknown variant: {variant}")
+        self.dropout = nn.Dropout(dropout)
+        self.fc_out = nn.Linear(hidden, out_dim)
+
+    def forward(self, x):
+        u, v = self.fc_in(x).chunk(2, dim=-1)  # [B, hidden], [B, hidden]
+        x = u * self.act(v)
+        x = self.dropout(x)
+        return self.fc_out(x)
+
+# ===== add: 双线性门控 =====
+class BilinearGate(nn.Module):
+    """
+    若 feature_wise=False -> 输出标量门 [B,1]
+    若 feature_wise=True  -> 输出通道门 [B,dim]
+    建议用0初始化, 使初始gate≈0.5, 融合稳定
+    """
+    def __init__(self, dim, feature_wise=False, bias=True):
+        super().__init__()
+        out_dim = dim if feature_wise else 1
+        self.bilinear = nn.Bilinear(dim, dim, out_dim, bias=bias)
+        nn.init.zeros_(self.bilinear.weight)
+        if bias:
+            nn.init.zeros_(self.bilinear.bias)
+
+    def forward(self, x, y):  # x,y: [B, dim]
+        g = self.bilinear(x, y)           # [B, 1] or [B, dim]
+        return torch.sigmoid(g)
+
+
 class BaseFullModel(nn.Module):
     """
     整体模型基类，包含文本 Transformer、跨模态注意力、门控及分类头等公共模块。
@@ -31,19 +75,12 @@ class BaseFullModel(nn.Module):
             embed_dim=cfg.transformer.emb_dim, num_heads=4, dropout=0.1
         )
         # 门控融合网络
-        self.gating_net = nn.Sequential(
-            nn.Linear(cfg.transformer.emb_dim * 2, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid(),
-        )
+        self.gating = BilinearGate(dim=64, feature_wise=True)
+
         # 分类头
-        self.shared_root = nn.Sequential(
-            nn.Linear(cfg.transformer.emb_dim, 128), nn.ReLU()
-        )
-        self.shared_true = nn.Sequential(
-            nn.Linear(cfg.transformer.emb_dim * 2, 128), nn.ReLU()
-        )
+        self.shared_root = GLUFeedForward(in_dim=64, hidden=128, out_dim=128, variant='swiglu', dropout=0.3)
+        self.shared_true = GLUFeedForward(in_dim=128, hidden=128, out_dim=128, variant='swiglu', dropout=0.2)
+
         self.head_root = nn.Linear(128, 2)
         self.head_true = nn.Sequential(
             nn.Linear(128, 64),
@@ -81,9 +118,8 @@ class BaseFullModel(nn.Module):
         attn_fused = attn_out.mean(dim=0)# [B, 64]
 
         # 4. 门控融合
-        concat = torch.cat([node_feat, pooled_text], dim=-1)# [B, 128]
-        gate = self.gating_net(concat)# [B, 1] in (0,1)
-        fused = gate * attn_fused + (1 - gate) * pooled_text# [B, 64]
+        gate = self.gating(attn_fused, pooled_text)  # [B, 1] 或 [B, 64]
+        fused = gate * attn_fused + (1 - gate) * pooled_text
 
         # 5. 根告警分类
         root_feat = self.shared_root(fused)# [B, 128]
