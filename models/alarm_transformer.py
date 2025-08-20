@@ -114,7 +114,7 @@ class XPosFlexMHA(nn.Module):
 
         def score_mod(score, b, h, q_idx, k_idx):
             zero = score.new_zeros(())
-            neg = torch.full_like(zero, torch.finfo(score.dtype).min)
+            neg = torch.tensor(-1e9, device=score.device, dtype=score.dtype)
             bias = zero
             if self.use_causal:  # 布尔常量可以 if
                 bias = bias + torch.where(q_idx < k_idx, neg, zero)
@@ -160,7 +160,7 @@ class XPosFlexMHA(nn.Module):
 
 class RotaryEncoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward, dropout=0.1,
-                 use_causal=True, xpos_scale_base=512.0):
+                 use_causal=True, xpos_scale_base=4096):
         super().__init__()
         self.self_attn = XPosFlexMHA(
             d_model, nhead, dropout=dropout,

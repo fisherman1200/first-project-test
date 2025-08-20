@@ -25,6 +25,7 @@ from trainers.pretrain_gnn import pretrain_gnn
 # from models.full_model import FullModel
 from models.hetero_full_model import FullModel
 
+torch.autograd.set_detect_anomaly(True)
 
 def train_model(cfg):
     # 打印统一的运行时间戳，便于管理输出目录

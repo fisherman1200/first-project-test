@@ -51,24 +51,36 @@ def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
         sample = {k: v.to(device) for k, v in sample.items()}
         with torch.no_grad():
             # 前向推理得到序列级根因概率
-            _, _, token_logits = model(sample)
+            _, out_true, token_logits = model(sample)
             prob = token_logits.softmax(dim=-1)[..., 1]
-        # 取概率最高的告警位置
-        topk = prob.topk(top_k, dim=1)
-        idx = topk.indices[0]
-        is_fault = prob.max().item() > 0.5
-        if is_fault:
-            nid = sample['node_idxs'][0, idx[0]].item()
-            did = sample['device_idxs'][0, idx[0]].item()
-            node_name = alarm_ds.idx_to_node[nid] if nid < len(alarm_ds.idx_to_node) else 'UNK'
-            device_id = alarm_ds.idx_to_device[did] if did < len(alarm_ds.idx_to_device) else 'UNK'
-            results.append({'fault': True, 'node': node_name, 'device': device_id})
-        else:
-            results.append({'fault': False, 'node': None, 'device': None})
+        if out_true.softmax(dim=-1)[..., 1] > 0.5:
+            # 取概率最高的告警位置
+            topk = prob.topk(top_k, dim=1)
+            idx_list = topk.indices[0]  # shape: [top_k]
+            val_list = topk.values[0]  # 对应的概率值
+
+            for i in range(top_k):
+                idx = idx_list[i].item()  # 序列位置
+                p = val_list[i].item()  # 概率值
+                is_fault = p > 0.8
+
+                # 取出对应的节点/设备 ID
+                nid = sample['node_idxs'][0, idx].item()
+                did = sample['device_idxs'][0, idx].item()
+
+                node_name = alarm_ds.idx_to_node[nid] if nid < len(alarm_ds.idx_to_node) else 'UNK'
+                device_id = alarm_ds.idx_to_device[did] if did < len(alarm_ds.idx_to_device) else 'UNK'
+
+                results.append({
+                    'fault': is_fault,
+                    'node': node_name,
+                    'device': device_id,
+                    'prob': round(p, 4)  # 也可以把概率保存下来，方便分析
+                })
     return results
 
 
 if __name__ == '__main__':
     import json
-    res = localize_fault('configs/config.yaml', 'data/processed/model/20250813_005148', top_k=3)
+    res = localize_fault('configs/config.yaml', 'data/processed/model/20250820_035420', top_k=3)
     print(json.dumps(res, ensure_ascii=False, indent=2))
