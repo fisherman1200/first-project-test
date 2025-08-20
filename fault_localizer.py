@@ -8,14 +8,14 @@ from utils.config import load_config
 
 
 def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
-    """根据训练好的模型进行故障定位，返回每条序列的预测结果。
+    """根据训练好的模型进行故障定位，返回概率最高的前 ``top_k`` 个样本。
 
     参数:
         cfg_path: 配置文件路径
         model_dir: 模型权重所在目录，应包含 ``best_model.pth``
-        top_k: 选取概率最高的前 k 个告警作为候选根因
+        top_k: 最终返回的样本数量
     返回:
-        List[Dict] 形如 [{'fault': True, 'node': '北京', 'device': 'dev1'}, ...]
+        List[Dict] 形如 [{'fault': True, 'node': '北京', 'device': 'dev1', 'prob': 0.9}, ...]
     """
     cfg = load_config(cfg_path)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -45,42 +45,43 @@ def localize_fault(cfg_path: str, model_dir: str, top_k: int = 1):
         edge_attr_dict = {k: v.to(device) for k, v in edge_attr_dict.items()}
         model.compute_node_embs(x_dict, edge_index_dict, edge_attr_dict)
 
-    results = []
+    sample_results = []
     for sample in loader:
         # 将样本字典中的张量移动到指定设备
         sample = {k: v.to(device) for k, v in sample.items()}
         with torch.no_grad():
-            # 前向推理得到序列级根因概率
+            # 前向推理得到序列级根因概率以及每个告警 token 的概率
             _, out_true, token_logits = model(sample)
-            prob = token_logits.softmax(dim=-1)[..., 1]
-        if out_true.softmax(dim=-1)[..., 1] > 0.5:
-            # 取概率最高的告警位置
-            topk = prob.topk(top_k, dim=1)
-            idx_list = topk.indices[0]  # shape: [top_k]
-            val_list = topk.values[0]  # 对应的概率值
+            token_prob = token_logits.softmax(dim=-1)[..., 1]
+            cls_prob = out_true.softmax(dim=-1)[..., 1]
 
-            for i in range(top_k):
-                idx = idx_list[i].item()  # 序列位置
-                p = val_list[i].item()  # 概率值
-                is_fault = p > 0.8
+        if cls_prob > 0.5:
+            # 只保留分类头判定为 "True" 的样本
+            max_prob, idx = token_prob.max(dim=1)  # 当前样本中概率最大的告警位置
+            idx = idx.item()
+            p = max_prob.item()
+            is_fault = p > 0.5
 
-                # 取出对应的节点/设备 ID
-                nid = sample['node_idxs'][0, idx].item()
-                did = sample['device_idxs'][0, idx].item()
+            # 取出对应的节点/设备 ID
+            nid = sample['node_idxs'][0, idx].item()
+            did = sample['device_idxs'][0, idx].item()
 
-                node_name = alarm_ds.idx_to_node[nid] if nid < len(alarm_ds.idx_to_node) else 'UNK'
-                device_id = alarm_ds.idx_to_device[did] if did < len(alarm_ds.idx_to_device) else 'UNK'
+            node_name = alarm_ds.idx_to_node[nid] if nid < len(alarm_ds.idx_to_node) else 'UNK'
+            device_id = alarm_ds.idx_to_device[did] if did < len(alarm_ds.idx_to_device) else 'UNK'
 
-                results.append({
-                    'fault': is_fault,
-                    'node': node_name,
-                    'device': device_id,
-                    'prob': round(p, 4)  # 也可以把概率保存下来，方便分析
-                })
-    return results
+            sample_results.append({
+                'fault': is_fault,
+                'node': node_name,
+                'device': device_id,
+                'prob': round(p, 4)  # 记录该样本的最大概率，便于排序
+            })
+
+    # 根据概率由高到低排序，并返回前 top_k 个样本
+    sample_results.sort(key=lambda x: x['prob'], reverse=True)
+    return sample_results[:top_k]
 
 
 if __name__ == '__main__':
     import json
-    res = localize_fault('configs/config.yaml', 'data/processed/model/20250820_035420', top_k=3)
+    res = localize_fault('configs/config.yaml', 'data/processed/model/20250820_054510', top_k=3)
     print(json.dumps(res, ensure_ascii=False, indent=2))
